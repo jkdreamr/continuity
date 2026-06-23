@@ -1,0 +1,198 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { Download, Upload, RotateCcw, Trash2, ShieldCheck } from "lucide-react";
+import { downloadText, slugify } from "@/lib/download";
+import { useWorkspace } from "@/components/continuity/WorkspaceProvider";
+import { useToast } from "@/components/ui/Toast";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { PageHeader, HydrateSkeleton } from "@/components/continuity/page-parts";
+
+export default function SettingsPage() {
+  const ws = useWorkspace();
+  const { toast } = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [paste, setPaste] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  if (!ws.hydrated) return <HydrateSkeleton />;
+
+  const { packs, tasks, artifacts } = ws.workspace;
+
+  function exportJson() {
+    downloadText(`continuity-workspace-${slugify(new Date().toISOString().slice(0, 10))}.json`, ws.exportText(), "application/json");
+    toast("Workspace exported");
+  }
+
+  function runImport(text: string) {
+    const result = ws.importText(text);
+    if (result.ok) {
+      setImportError(null);
+      setPaste("");
+      toast("Workspace imported");
+    } else {
+      setImportError(result.error);
+    }
+  }
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      runImport(await file.text());
+    } catch {
+      setImportError("Couldn't read that file.");
+    }
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  return (
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow="Data control"
+        title="Settings"
+        lede="Continuity is local-first. Everything you create lives in this browser — you can take it with you or wipe it at any time."
+      />
+
+      <div className="flex items-start gap-3 rounded-md border border-green/30 bg-green-soft px-4 py-3.5">
+        <ShieldCheck size={18} className="mt-0.5 shrink-0 text-green-ink" />
+        <div>
+          <p className="text-[13px] font-medium text-green-ink">
+            Your MVP data stays in this browser unless you export it.
+          </p>
+          <p className="mt-0.5 text-2xs leading-snug text-green-ink/80">
+            No account, no server, no background collection. Context is selected from the packs and
+            choices you can see — nothing hidden.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <Stat label="Packs" value={packs.length} />
+        <Stat label="Tasks" value={tasks.length} />
+        <Stat label="Saved outputs" value={artifacts.length} />
+      </div>
+
+      <Card
+        title="Export"
+        body="Download your entire workspace as a JSON file — packs, tasks, and saved outputs. Human-readable and yours to keep."
+      >
+        <Button variant="secondary" onClick={exportJson}>
+          <Download size={15} /> Export workspace (JSON)
+        </Button>
+      </Card>
+
+      <Card
+        title="Import"
+        body="Load a workspace from a previously exported JSON file. This replaces what's currently in this browser."
+      >
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <input ref={fileRef} type="file" accept="application/json,.json" onChange={onFile} className="hidden" />
+            <Button variant="secondary" onClick={() => fileRef.current?.click()}>
+              <Upload size={15} /> Choose JSON file
+            </Button>
+            <span className="text-2xs text-ink-faint">or paste below</span>
+          </div>
+          <textarea
+            value={paste}
+            onChange={(e) => {
+              setPaste(e.target.value);
+              setImportError(null);
+            }}
+            placeholder='{ "app": "continuity", "workspace": { ... } }'
+            rows={4}
+            spellCheck={false}
+            aria-label="Paste workspace JSON"
+            className="brief w-full resize-y rounded border border-rule bg-surface-sunk px-3 py-2 text-[12px] focus-visible:outline-2 focus-visible:outline-signal"
+          />
+          {importError && (
+            <p role="alert" className="rounded border border-rust/30 bg-rust-soft px-3 py-2 text-[13px] text-rust-ink">
+              {importError}
+            </p>
+          )}
+          <Button variant="primary" size="sm" disabled={!paste.trim()} onClick={() => runImport(paste)}>
+            Import from text
+          </Button>
+        </div>
+      </Card>
+
+      <Card
+        title="Reset demo workspace"
+        body="Restore the seeded Continuity demo — the sample packs, tasks, and suggestions. Useful for a clean walkthrough."
+      >
+        <Button variant="secondary" onClick={() => setConfirmReset(true)}>
+          <RotateCcw size={15} /> Reset demo data
+        </Button>
+      </Card>
+
+      <Card
+        title="Clear all local data"
+        body="Permanently delete everything in this browser — all packs, tasks, and outputs. Export first if you want to keep a copy."
+        danger
+      >
+        <Button variant="danger" onClick={() => setConfirmClear(true)}>
+          <Trash2 size={15} /> Clear all data
+        </Button>
+      </Card>
+
+      <ConfirmDialog
+        open={confirmReset}
+        title="Reset to the demo workspace?"
+        body="This replaces your current packs and tasks with the seeded Continuity demo. Anything you haven't exported will be lost."
+        confirmLabel="Reset demo"
+        onConfirm={() => {
+          ws.resetDemo();
+          toast("Demo workspace restored");
+        }}
+        onClose={() => setConfirmReset(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmClear}
+        title="Clear all data?"
+        body="Every pack, task, and saved output in this browser will be permanently deleted. This can't be undone."
+        confirmLabel="Delete everything"
+        danger
+        onConfirm={() => {
+          ws.clearAll();
+          toast("All local data cleared");
+        }}
+        onClose={() => setConfirmClear(false)}
+      />
+    </div>
+  );
+}
+
+function Card({
+  title,
+  body,
+  danger,
+  children,
+}: {
+  title: string;
+  body: string;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-rule bg-surface p-5 shadow-card">
+      <h2 className={`font-display text-lg ${danger ? "text-rust-ink" : "text-ink"}`}>{title}</h2>
+      <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-ink-muted">{body}</p>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-rule bg-surface px-3 py-3 text-center shadow-card">
+      <div className="tabular font-display text-2xl text-ink">{value}</div>
+      <div className="eyebrow mt-0.5">{label}</div>
+    </div>
+  );
+}
