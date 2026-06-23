@@ -189,8 +189,66 @@ export type BuildReaction =
 
 export type Reaction = WritingReaction | BuildReaction;
 
+// --- V7: the Writing Agent ---------------------------------------------------
+
+export type DocumentKind =
+  | "manager_email"
+  | "investor_follow_up"
+  | "memo"
+  | "post"
+  | "reply"
+  | "other";
+
+export type Relationship = "manager" | "peer" | "investor" | "customer" | "public";
+
+/** A task-local, editable inference about the current document. Never durable. */
+export type DocumentBrief = {
+  kind: DocumentKind;
+  goal?: string;
+  audience?: string;
+  relationship?: Relationship;
+  tone?: string[];
+  facts: string[];
+  unknowns: string[];
+  confidence: ContextConfidence;
+  source: "user_stated" | "inferred_from_document";
+};
+
+export type WritingDocument = {
+  id: string;
+  title: string;
+  /** ProseMirror/Tiptap JSON. Loosely typed to keep this module framework-free. */
+  contentJson: unknown;
+  plainText: string;
+  mode: "writing";
+  brief?: DocumentBrief;
+  liveHelpEnabled: boolean;
+  activeMemoryOverrides: { includeIds: string[]; excludeIds: string[] };
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type InsightKind =
+  | "ask_clarity"
+  | "tone_fit"
+  | "voice_drift"
+  | "redundancy"
+  | "unsupported_specificity";
+
+export type DocumentInsight = {
+  id: string;
+  kind: InsightKind;
+  from: number;
+  to: number;
+  severity: "low" | "medium" | "high";
+  message: string;
+  rationale: string;
+  proposedText?: string;
+};
+
 export type Workspace = {
-  /** 1 = V4 shape; 2 = V5 (adds requests + drafts). */
+  /** 1 = V4; 2 = V5 (requests + drafts); 3 = V7 (writing documents). */
   version: number;
   packs: ContextPack[];
   tasks: Task[];
@@ -198,6 +256,8 @@ export type Workspace = {
   /** V5 */
   requests: QuickRequest[];
   drafts: Draft[];
+  /** V7 */
+  documents: WritingDocument[];
   /** Proposal ids the user has dismissed, so we don't nag. */
   dismissedProposals: string[];
   seededDemo: boolean;

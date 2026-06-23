@@ -61,5 +61,5 @@ export function parseImport(text: string): ImportResult {
   if (!result.success) {
     return { ok: false, error: friendlyZodError(result.error) };
   }
-  return { ok: true, workspace: result.data };
+  return { ok: true, workspace: result.data as Workspace };
 }

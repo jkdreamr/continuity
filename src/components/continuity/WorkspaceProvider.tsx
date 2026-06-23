@@ -20,9 +20,11 @@ import type {
   QuickRequest,
   Task,
   Workspace,
+  WritingDocument,
 } from "@/types/continuity";
 import type { ProviderStatus } from "@/lib/server/providerConfig";
 import { newId, nowIso } from "@/lib/id";
+import { newWritingDocument } from "@/lib/writing/writingDocs";
 import { defaultRails } from "@/lib/rails";
 import { compile } from "@/lib/compile";
 import { generateProposals } from "@/lib/memory";
@@ -58,6 +60,11 @@ type WorkspaceApi = {
   updateRequest: (id: string, patch: Partial<QuickRequest>) => void;
   recordDraft: (draft: Draft) => void;
   updateDraft: (id: string, content: string) => void;
+
+  // V7 — writing documents
+  createDocument: (partial?: Partial<WritingDocument>) => WritingDocument;
+  updateDocument: (id: string, patch: Partial<WritingDocument>) => void;
+  deleteDocument: (id: string) => void;
 
   exportText: () => string;
   importText: (text: string) => ImportResult;
@@ -284,6 +291,23 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const createDocument = useCallback<WorkspaceApi["createDocument"]>((partial) => {
+    const doc = newWritingDocument(partial);
+    setWorkspace((ws) => ({ ...ws, documents: [doc, ...ws.documents] }));
+    return doc;
+  }, []);
+
+  const updateDocument = useCallback<WorkspaceApi["updateDocument"]>((id, patch) => {
+    setWorkspace((ws) => ({
+      ...ws,
+      documents: ws.documents.map((d) => (d.id === id ? { ...d, ...patch, updatedAt: nowIso() } : d)),
+    }));
+  }, []);
+
+  const deleteDocument = useCallback<WorkspaceApi["deleteDocument"]>((id) => {
+    setWorkspace((ws) => ({ ...ws, documents: ws.documents.filter((d) => d.id !== id) }));
+  }, []);
+
   const proposals = useMemo(() => generateProposals(workspace), [workspace]);
 
   const acceptProposal = useCallback<WorkspaceApi["acceptProposal"]>((proposal) => {
@@ -368,6 +392,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       updateRequest,
       recordDraft,
       updateDraft,
+      createDocument,
+      updateDocument,
+      deleteDocument,
       exportText,
       importText,
       resetDemo,
@@ -394,6 +421,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       updateRequest,
       recordDraft,
       updateDraft,
+      createDocument,
+      updateDocument,
+      deleteDocument,
       exportText,
       importText,
       resetDemo,

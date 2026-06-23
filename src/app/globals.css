@@ -65,6 +65,72 @@
   animation: thread-flow 1.1s linear infinite;
 }
 
+/* Tiptap writing editor */
+.tiptap-prose {
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: var(--ink);
+  min-height: 58vh;
+}
+.tiptap-prose:focus {
+  outline: none;
+}
+.tiptap-prose p {
+  margin: 0 0 0.85em;
+}
+.tiptap-prose h2,
+.tiptap-prose h3 {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 1.2em 0 0.4em;
+}
+.tiptap-prose h2 {
+  font-size: 1.5rem;
+}
+.tiptap-prose h3 {
+  font-size: 1.2rem;
+}
+.tiptap-prose ul,
+.tiptap-prose ol {
+  margin: 0 0 0.85em;
+  padding-left: 1.3em;
+}
+.tiptap-prose ul {
+  list-style: disc;
+}
+.tiptap-prose ol {
+  list-style: decimal;
+}
+.tiptap-prose blockquote {
+  border-left: 2px solid var(--rule);
+  padding-left: 0.9em;
+  color: var(--ink-muted);
+  font-style: italic;
+}
+.tiptap-prose strong {
+  font-weight: 600;
+}
+.tiptap-prose a {
+  color: var(--signal);
+  text-decoration: underline;
+}
+/* Ghost completion is visibly separate until Tab. */
+.ghost-completion {
+  color: var(--ink-faint);
+  opacity: 0.65;
+  pointer-events: none;
+  user-select: none;
+}
+/* Placeholder for the empty editor. */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--ink-faint);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

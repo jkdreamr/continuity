@@ -1,10 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowRight,
   Wand2,
+  PenLine,
   ClipboardPaste,
   Copy,
   RefreshCw,
@@ -14,7 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { BuildReaction, ContextPack, Draft, Mode, QuickRequest, Reaction, TargetTool } from "@/types/continuity";
-import { inferMode } from "@/lib/inferMode";
+import { inferBrief } from "@/lib/writing/documentBrief";
 import { selectContextMix } from "@/lib/contextMix";
 import { buildGenerationMessages, flattenMessages } from "@/lib/generationPrompt";
 import { requestDraft } from "@/lib/generateClient";
@@ -64,11 +66,13 @@ export default function NowPage() {
 function NowInner() {
   const ws = useWorkspace();
   const { toast } = useToast();
+  const router = useRouter();
   const params = useSearchParams();
   const paramRequest = params.get("request");
 
   const [askText, setAskText] = useState("");
-  const [modeOverride, setModeOverride] = useState<Mode | null>(null);
+  // The Now choice: Write (the document desk) or Build prompt (the studio).
+  const [surface, setSurface] = useState<Mode>("writing");
   const [source, setSource] = useState("");
   const [showSource, setShowSource] = useState(false);
   const [askOverrides, setAskOverrides] = useState<{ includeIds: string[]; excludeIds: string[]; spaceId?: string }>({
@@ -97,7 +101,7 @@ function NowInner() {
   const currentDraft = drafts[0] ?? null;
 
   const isResult = view === "result" && request;
-  const mode: Mode = isResult ? request.selectedMode : modeOverride ?? inferMode(askText);
+  const mode: Mode = isResult ? request.selectedMode : surface;
   const mixText = isResult ? request.text : askText;
   const overrides = useMemo(
     () =>
@@ -223,20 +227,30 @@ function NowInner() {
     setGen({ status: "idle" });
   }
 
+  function startWriting(seed?: string) {
+    const text = (seed ?? askText).trim();
+    const inferred = text ? inferBrief(text, { userStated: true }) : undefined;
+    const doc = ws.createDocument({ brief: inferred && inferred.confidence !== "low" ? inferred : undefined });
+    router.push(`/write?doc=${doc.id}`);
+  }
+
   function run() {
+    if (surface === "writing") {
+      startWriting();
+      return;
+    }
     const text = askText.trim();
     if (!text) return;
-    const selectedMode = modeOverride ?? inferMode(text);
     const req: QuickRequest = {
       id: newId("req"),
       text,
-      inferredMode: inferMode(text),
-      selectedMode,
+      inferredMode: "build",
+      selectedMode: "build",
       spaceId: askOverrides.spaceId,
       source: source.trim() || undefined,
       includeIds: askOverrides.includeIds,
       excludeIds: askOverrides.excludeIds,
-      targetTool: selectedMode === "build" ? "Claude Code" : "Claude",
+      targetTool: "Claude Code",
       createdAt: nowIso(),
       updatedAt: nowIso(),
     };
@@ -244,8 +258,7 @@ function NowInner() {
     setRequestId(req.id);
     setView("result");
     setEditBuffer("");
-    if (selectedMode === "build") makeBrief(req);
-    else generateWriting(req);
+    makeBrief(req);
   }
 
   function onReact(reaction: Reaction) {
@@ -282,11 +295,11 @@ function NowInner() {
 
   function changeMode(m: Mode) {
     if (isResult && request) {
-      ws.updateRequest(request.id, { selectedMode: m, targetTool: m === "build" ? "Claude Code" : "Claude" });
-      if (m === "build") makeBrief({ ...request, selectedMode: m });
-      else generateWriting({ ...request, selectedMode: m });
+      // From a Build result, switching to Writing opens the document desk.
+      if (m === "writing") startWriting(request.text);
+      else ws.updateRequest(request.id, { selectedMode: "build", targetTool: "Claude Code" });
     } else {
-      setModeOverride(m);
+      setSurface(m);
     }
   }
 
@@ -338,7 +351,6 @@ function NowInner() {
     setAskText("");
     setSource("");
     setShowSource(false);
-    setModeOverride(null);
     setAskOverrides({ includeIds: [], excludeIds: [] });
     setGen({ status: "idle" });
     setTimeout(() => askRef.current?.focus(), 0);
@@ -468,6 +480,10 @@ function NowInner() {
           </h1>
         )}
 
+        <div className="mb-3 flex justify-center">
+          <SurfaceChoice surface={surface} onChange={setSurface} />
+        </div>
+
         <div className="rounded-xl border border-rule bg-surface p-3 shadow-card focus-within:border-ink/25">
           <textarea
             ref={askRef}
@@ -480,7 +496,11 @@ function NowInner() {
                 run();
               }
             }}
-            placeholder="What are you trying to make?"
+            placeholder={
+              surface === "build"
+                ? "Describe the software change you need…"
+                : "What do you want to write? (optional — or just open a blank page)"
+            }
             rows={4}
             className="w-full resize-none bg-transparent px-2 py-1.5 text-[16px] leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none"
           />
@@ -496,7 +516,6 @@ function NowInner() {
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-rule px-1 pt-2.5">
-            <ModeChip mode={mode} onChange={changeMode} />
             <UsingLine atoms={atoms} onOpen={() => setDrawerOpen(true)} />
             <div className="ml-auto flex items-center gap-2">
               <button
@@ -513,14 +532,14 @@ function NowInner() {
               >
                 {showSource ? <X size={13} /> : <Plus size={13} />} Source
               </button>
-              <Button variant="primary" onClick={run} disabled={!askText.trim()}>
-                {mode === "build" ? (
+              <Button variant="primary" onClick={run} disabled={surface === "build" && !askText.trim()}>
+                {surface === "build" ? (
                   <>
                     <Wand2 size={16} /> Make a change brief
                   </>
                 ) : (
                   <>
-                    Write it <ArrowRight size={16} />
+                    Start writing <ArrowRight size={16} />
                   </>
                 )}
               </Button>
@@ -529,8 +548,8 @@ function NowInner() {
         </div>
 
         <p className="mt-2 px-1 text-2xs text-ink-faint">
-          {mode === "build" ? "Build Beta · " : ""}
-          Press {modifierKey()}+Enter to run · {modifierKey()}+K to focus
+          {surface === "build" ? "Build Beta · " : ""}
+          Press {modifierKey()}+Enter to {surface === "build" ? "compile" : "open the desk"} · {modifierKey()}+K to focus
         </p>
 
         {firstUse && (
@@ -683,30 +702,66 @@ function labelFor(reaction: Reaction): string {
   return reaction.replace(/_/g, " ");
 }
 
+function SurfaceChoice({ surface, onChange }: { surface: Mode; onChange: (m: Mode) => void }) {
+  return (
+    <div role="tablist" aria-label="Surface" className="inline-flex items-center gap-0.5 rounded-lg border border-rule bg-surface-sunk p-0.5">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={surface === "writing"}
+        onClick={() => onChange("writing")}
+        className={cx(
+          "inline-flex items-center gap-1.5 rounded px-3.5 py-1.5 text-sm font-medium transition-colors",
+          surface === "writing" ? "bg-surface text-ink shadow-card" : "text-ink-muted hover:text-ink",
+        )}
+      >
+        <PenLine size={15} /> Write
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={surface === "build"}
+        onClick={() => onChange("build")}
+        className={cx(
+          "inline-flex items-center gap-1.5 rounded px-3.5 py-1.5 text-sm font-medium transition-colors",
+          surface === "build" ? "bg-surface text-ink shadow-card" : "text-ink-muted hover:text-ink",
+        )}
+      >
+        <Wand2 size={15} /> Build prompt
+      </button>
+    </div>
+  );
+}
+
 function RecentWork({ onOpen }: { onOpen: (requestId: string) => void }) {
   const ws = useWorkspace();
-  const recent = [...ws.workspace.requests]
+  const docs = [...ws.workspace.documents].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 4);
+  const builds = ws.workspace.requests
+    .filter((r) => r.selectedMode === "build")
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 4);
-  if (!recent.length) return null;
+    .slice(0, 3);
+  if (!docs.length && !builds.length) return null;
   return (
     <div className="mt-8 space-y-2">
       <p className="eyebrow">Recent</p>
-      {recent.map((r) => (
+      {docs.map((d) => (
+        <Link
+          key={d.id}
+          href={`/write?doc=${d.id}`}
+          className="flex w-full items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left shadow-card transition-colors hover:border-ink/20"
+        >
+          <span className="shrink-0 rounded-sm bg-signal-soft px-1.5 py-0.5 font-mono text-2xs uppercase text-signal-ink">doc</span>
+          <span className="truncate text-[13px] text-ink-muted">{d.title || d.plainText.slice(0, 80) || "Untitled draft"}</span>
+        </Link>
+      ))}
+      {builds.map((r) => (
         <button
           key={r.id}
           type="button"
           onClick={() => onOpen(r.id)}
           className="flex w-full items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left shadow-card transition-colors hover:border-ink/20"
         >
-          <span
-            className={cx(
-              "shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-2xs uppercase",
-              r.selectedMode === "build" ? "bg-rust-soft text-rust-ink" : "bg-signal-soft text-signal-ink",
-            )}
-          >
-            {r.selectedMode}
-          </span>
+          <span className="shrink-0 rounded-sm bg-rust-soft px-1.5 py-0.5 font-mono text-2xs uppercase text-rust-ink">build</span>
           <span className="truncate text-[13px] text-ink-muted">{r.text}</span>
         </button>
       ))}

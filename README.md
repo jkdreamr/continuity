@@ -2,31 +2,33 @@
 
 **Type what you need. Continuity carries the rest.**
 
-Continuity is a local-first **personal creation layer** for writing and building with AI. You type one natural-language request; Continuity quietly applies your approved voice, project, and guardrails, tells you exactly what it used, and hands back an editable draft — no task forms, no prompt assembly, no copy-paste ritual.
+Continuity is a local-first **personal creation layer** for writing and building with AI. It quietly applies your approved voice, project, and guardrails, tells you exactly what it used, and keeps authorship with you — no task forms, no prompt assembly, no copy-paste ritual.
 
-Two surfaces, one engine:
+Two distinct surfaces, one shared context engine. On **Now** you pick one:
 
-- **Writing** (default) — produces a finished, editable **draft** in-app via a server-side AI provider.
-- **Build (Beta)** — produces a scope-safe **change brief** to copy into Claude Code, Lovable, or a generic builder.
+- **Write** (default) — opens **Continuity Writer**, a context-aware document editor (Tiptap). Write from a blank page, a one-line brief, or pasted source. As you write you get low-noise inline help: ghost completions accepted with **Tab**, sparse contextual insights, and selection-level rewrites via live **Tune** sliders. _A writer never has to stop writing to operate the AI._
+- **Build prompt** — **Build Prompt Studio** stays prompt-first: describe a software change, get a scope-safe **change brief** to copy into Claude Code, Lovable, or a generic builder.
 
 > Continuity chooses defaults and removes form-filling, but **automatic ≠ invisible**: every applied piece of context shows a plain-language reason and can be turned off in one tap. No background clipboard reads, no page scraping, no hidden memory.
 
 ---
 
-## The loop
+## The loops
 
-**Writing:** `Ask → Draft → React`
-Type → **Write it** → edit the draft or tap a reaction (Shorter, Warmer, More like me, More direct, Less polished, Reframe).
+**Writing:** `Start → Write → Inline help → Tune selection → Learn`
+Open the document desk, write. Ghost text appears at a natural pause — **Tab** to accept, **Esc** to dismiss. Select a passage for the **Tune** bubble (`Shorter · Warmer · More direct · Tune`); the three context-specific sliders show their intent live and apply only on your click. A task-local **Document Brief** (editable chips) and a quiet `Using:` line keep context visible.
 
-**Build:** `Ask → Change Brief → Copy / Continue`
-Type → **Make a change brief** → Copy for Claude Code / Lovable, or refine (Safer, Bolder, More editorial, Keep structure, Plan first).
+**Build:** `Ask → Change Brief → Copy to tool`
+Type → **Make a change brief** → Copy for Claude Code / Lovable / Generic, or refine (Safer, Bolder, More editorial, Keep structure, Plan first).
 
-The whole primary writing flow is **at most two deliberate actions** after typing: click *Write it*, then copy or react.
+### Live writing help (ghost / insights / Tune)
+- **Quiet by default.** Ghost completion is gated by an idle pause, a collapsed cursor, enough context, and safety checks (no code/URL/email, no finished paragraph, no IME). At most one suggestion; it is a decoration, never document content until **Tab**.
+- **Insights are semantic, not grammar squiggles** — ask clarity, tone fit, voice drift, redundancy, unsupported specificity. ≤3 at once, each with a range and a reason; Apply / Dismiss / Not-for-this-document. Validated and **fails closed**.
+- **No fake output.** Without a provider key, ghost/insights stay off and Tune shows the exact prompt it would send. Nothing is fabricated.
 
 ### Keyboard
-- `Cmd/Ctrl + Enter` — run the request
-- `Cmd/Ctrl + K` — focus the ask field
-- `Enter` — newline
+- `Tab` accept ghost · `Esc` dismiss (in the editor)
+- `Cmd/Ctrl + Enter` — run · `Cmd/Ctrl + K` — focus the ask (on Now)
 
 ---
 
@@ -99,21 +101,24 @@ Settings shows a live data-flow ledger and the provider connection status (never
 ```
 src/
   app/
-    page.tsx              # Now — the ask → draft → react surface
-    library/              # Library — your voice, spaces, keep true, visual direction
-    settings/             # Data control, provider status, privacy
-    api/generate/         # Server-side generation route (key never leaves the server)
-    api/provider-status/  # Reports configured/provider/model — never the key
-  components/continuity/   # Now composer, context drawer, mode chip, using line, reactions…
-  components/ui/           # Button, Field, Drawer, ConfirmDialog, Toast
+    page.tsx               # Now — [Write] [Build prompt] choice
+    write/                 # Continuity Writer — the Tiptap document desk
+    library/               # Library — your voice, spaces, keep true, visual direction
+    settings/              # Data control, provider status, privacy
+    api/generate · api/provider-status · api/analyze-source
+    api/writing/{generate,brief,complete,insights,transform-selection}  # server-only
+  components/continuity/
+    writing/               # DocumentEditor, GhostCompletion, SelectionTune, DocumentBriefBar
+    …                      # context drawer, using line, reactions, mode chip…
+  components/ui/            # Button, Field, Drawer, ConfirmDialog, Toast
   lib/
-    inferMode · contextMix · reactions · generationPrompt · generateClient
-    requestTask · requests · migrate · compile · selection · rails · …
+    writing/               # documentBrief · completionGate · tuneTemplates · insights
+                           # agentPrompts · agentClient · sourceAnalysis · writingDocs
+    contextMix · reactions · generationPrompt · migrate · compile · selection · rails · …
     server/                # provider adapter + config (server-only)
-  data/                    # seed Library
-  types/                   # domain model
-tests/                     # Vitest unit tests
-docs/                      # mvp-scope.md · v5-product-reset.md
+  data/ · types/
+tests/                     # Vitest unit tests (96)
+docs/                      # mvp-scope.md · v5-product-reset.md · v7-writing-agent.md
 ```
 
 ## Stack

@@ -10,6 +10,7 @@ function emptyWs(): Workspace {
     artifacts: [],
     requests: [],
     drafts: [],
+    documents: [],
     dismissedProposals: [],
     seededDemo: false,
   };
