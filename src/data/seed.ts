@@ -189,10 +189,12 @@ export function buildSeedWorkspace(): Workspace {
   const packs = seedPacks();
   const tasks = seedTasks();
   return {
-    version: 1,
+    version: 2,
     packs,
     tasks,
     artifacts: seedArtifacts(packs, tasks),
+    requests: [],
+    drafts: [],
     dismissedProposals: [],
     seededDemo: true,
   };
@@ -200,10 +202,12 @@ export function buildSeedWorkspace(): Workspace {
 
 export function emptyWorkspace(): Workspace {
   return {
-    version: 1,
+    version: 2,
     packs: [],
     tasks: [],
     artifacts: [],
+    requests: [],
+    drafts: [],
     dismissedProposals: [],
     seededDemo: false,
   };

@@ -65,11 +65,54 @@ export const OutputArtifactSchema = z.object({
   createdAt: z.string(),
 });
 
+export const ReactionSchema = z.enum([
+  "more_like_me",
+  "shorter",
+  "warmer",
+  "more_direct",
+  "less_polished",
+  "reframe",
+  "safer",
+  "bolder",
+  "more_editorial",
+  "keep_structure",
+  "plan_first",
+]);
+
+export const QuickRequestSchema = z.object({
+  id: z.string().min(1),
+  text: z.string(),
+  inferredMode: ModeSchema,
+  selectedMode: ModeSchema,
+  spaceId: z.string().optional(),
+  source: z.string().optional(),
+  includeIds: z.array(z.string()),
+  excludeIds: z.array(z.string()),
+  targetTool: TargetToolSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const DraftSchema = z.object({
+  id: z.string().min(1),
+  requestId: z.string(),
+  mode: ModeSchema,
+  content: z.string(),
+  provider: z.string().optional(),
+  reaction: ReactionSchema.optional(),
+  activeContextIds: z.array(z.string()),
+  parentDraftId: z.string().optional(),
+  createdAt: z.string(),
+});
+
 export const WorkspaceSchema = z.object({
   version: z.number(),
   packs: z.array(ContextPackSchema),
   tasks: z.array(TaskSchema),
   artifacts: z.array(OutputArtifactSchema),
+  // V5 — optional with defaults so V4 (v1) data and exports load without loss.
+  requests: z.array(QuickRequestSchema).default([]),
+  drafts: z.array(DraftSchema).default([]),
   dismissedProposals: z.array(z.string()),
   seededDemo: z.boolean(),
 });

@@ -1,226 +1,715 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ArrowRight, Plus, FileText } from "lucide-react";
-import type { Mode, Task } from "@/types/continuity";
-import { activePacks } from "@/lib/selection";
-import { SCOPE_LABEL } from "@/lib/labels";
-import { useWorkspace } from "@/components/continuity/WorkspaceProvider";
-import { ModeSwitch } from "@/components/continuity/ModeSwitch";
-import { Button } from "@/components/ui/Button";
-import { PageHeader, SectionTitle, EmptyState, HydrateSkeleton } from "@/components/continuity/page-parts";
-import { PackEditor, type PackDraft } from "@/components/continuity/PackEditor";
-import { ProposalCard } from "@/components/continuity/ProposalCard";
-import { KindIcon } from "@/components/continuity/KindIcon";
-import { ACCENT } from "@/lib/accent";
-import { kindMeta } from "@/lib/packKinds";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import {
+  ArrowRight,
+  Wand2,
+  ClipboardPaste,
+  Copy,
+  RefreshCw,
+  FileCode2,
+  Plus,
+  X,
+  Loader2,
+} from "lucide-react";
+import type { BuildReaction, ContextPack, Draft, Mode, QuickRequest, Reaction, TargetTool } from "@/types/continuity";
+import { inferMode } from "@/lib/inferMode";
+import { selectContextMix } from "@/lib/contextMix";
+import { buildGenerationMessages, flattenMessages } from "@/lib/generationPrompt";
+import { requestDraft } from "@/lib/generateClient";
+import { reactionInstruction } from "@/lib/reactions";
+import { compileActive } from "@/lib/compile";
+import { requestToTask, buildRailsForReaction } from "@/lib/requestTask";
+import { draftsForRequest } from "@/lib/requests";
+import { newId, nowIso } from "@/lib/id";
+import { downloadText, slugify } from "@/lib/download";
 import { cx } from "@/lib/cx";
+import { useWorkspace } from "@/components/continuity/WorkspaceProvider";
+import { useToast } from "@/components/ui/Toast";
+import { Button } from "@/components/ui/Button";
+import { ModeChip } from "@/components/continuity/ModeChip";
+import { UsingLine } from "@/components/continuity/UsingLine";
+import { ContextDrawer } from "@/components/continuity/ContextDrawer";
+import { ReactionRow } from "@/components/continuity/ReactionRow";
+import { HydrateSkeleton } from "@/components/continuity/page-parts";
 
-export default function HomePage() {
+const EXAMPLES = [
+  "Write a thoughtful follow-up to an investor I met yesterday.",
+  "Turn these rough notes into a clear founder update.",
+  "Make this email warmer, but keep it direct.",
+  "Redesign the onboarding section without touching authentication.",
+];
+
+const BUILD_TARGETS: { tool: TargetTool; label: string }[] = [
+  { tool: "Claude Code", label: "Copy for Claude Code" },
+  { tool: "Lovable", label: "Copy for Lovable" },
+  { tool: "Generic", label: "Copy generic" },
+];
+
+type GenState =
+  | { status: "idle" }
+  | { status: "loading"; reaction: Reaction | null }
+  | { status: "error"; message: string }
+  | { status: "not_configured" };
+
+export default function NowPage() {
+  return (
+    <Suspense fallback={<HydrateSkeleton />}>
+      <NowInner />
+    </Suspense>
+  );
+}
+
+function NowInner() {
   const ws = useWorkspace();
-  const router = useRouter();
-  const [mode, setMode] = useState<Mode>("writing");
-  const [editorOpen, setEditorOpen] = useState(false);
+  const { toast } = useToast();
+  const params = useSearchParams();
+  const paramRequest = params.get("request");
 
-  const recentTasks = useMemo(
-    () => [...ws.workspace.tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5),
-    [ws.workspace.tasks],
+  const [askText, setAskText] = useState("");
+  const [modeOverride, setModeOverride] = useState<Mode | null>(null);
+  const [source, setSource] = useState("");
+  const [showSource, setShowSource] = useState(false);
+  const [askOverrides, setAskOverrides] = useState<{ includeIds: string[]; excludeIds: string[]; spaceId?: string }>({
+    includeIds: [],
+    excludeIds: [],
+  });
+  const [view, setView] = useState<"ask" | "result">("ask");
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [gen, setGen] = useState<GenState>({ status: "idle" });
+  const [editBuffer, setEditBuffer] = useState("");
+
+  const abortRef = useRef<AbortController | null>(null);
+  const askRef = useRef<HTMLTextAreaElement>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const packs = ws.workspace.packs;
+  const request = useMemo(
+    () => (requestId ? ws.workspace.requests.find((r) => r.id === requestId) ?? null : null),
+    [requestId, ws.workspace.requests],
   );
-  const alwaysOn = useMemo(
-    () => ws.workspace.packs.filter((p) => p.activation === "always_on"),
-    [ws.workspace.packs],
+  const drafts = useMemo(
+    () => (request ? draftsForRequest(ws.workspace, request.id) : []),
+    [request, ws.workspace],
+  );
+  const currentDraft = drafts[0] ?? null;
+
+  const isResult = view === "result" && request;
+  const mode: Mode = isResult ? request.selectedMode : modeOverride ?? inferMode(askText);
+  const mixText = isResult ? request.text : askText;
+  const overrides = useMemo(
+    () =>
+      request && view === "result"
+        ? { includeIds: request.includeIds, excludeIds: request.excludeIds, spaceId: request.spaceId }
+        : askOverrides,
+    [request, view, askOverrides],
   );
 
-  function startTask() {
-    const task = ws.createTask({ mode });
-    router.push(`/compose?task=${task.id}`);
-  }
+  const mix = useMemo(
+    () => selectContextMix({ text: mixText, mode, ...overrides }, packs),
+    [mixText, mode, overrides, packs],
+  );
+  const activePacks = useMemo(
+    () => mix.applied.map((a) => packs.find((p) => p.id === a.contextId)).filter(Boolean) as ContextPack[],
+    [mix.applied, packs],
+  );
+  const availablePacks = useMemo(
+    () =>
+      packs.filter(
+        (p) =>
+          (p.mode === "both" || p.mode === mode) &&
+          !mix.applied.some((a) => a.contextId === p.id) &&
+          !mix.suggestions.some((a) => a.contextId === p.id) &&
+          !overrides.excludeIds.includes(p.id),
+      ),
+    [packs, mode, mix, overrides.excludeIds],
+  );
+  const atoms = usingAtoms(activePacks);
 
-  function handleEdit(proposalPackId: string) {
-    router.push(`/packs?edit=${proposalPackId}`);
-  }
+  // Cmd/Ctrl+K focuses the ask field from anywhere.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setView("ask");
+        setTimeout(() => askRef.current?.focus(), 0);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Load a draft's content into the editable buffer when it changes.
+  useEffect(() => {
+    if (currentDraft) setEditBuffer(currentDraft.content);
+  }, [currentDraft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Deep link: /?request=<id> opens that request's latest result.
+  useEffect(() => {
+    if (paramRequest && ws.workspace.requests.some((r) => r.id === paramRequest)) {
+      setRequestId(paramRequest);
+      setView("result");
+    }
+  }, [paramRequest, ws.hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ws.hydrated) return <HydrateSkeleton />;
 
-  return (
-    <div className="space-y-9">
-      <PageHeader
-        eyebrow="The context layer"
-        title="Decide what your AI knows — before it writes or builds."
-        lede="Continuity keeps your voice, project facts, decisions, and constraints as visible Context Packs. Start a task, see exactly which context is active and why, tune a few plain controls, and copy a sharper prompt — without pasting the same background again."
-      />
+  const firstUse = ws.workspace.requests.length === 0 && ws.workspace.drafts.length === 0;
 
-      {/* Start bar */}
-      <div className="flex flex-col gap-4 rounded-lg border border-rule bg-surface p-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          <ModeSwitch mode={mode} onChange={setMode} />
-          <p className="text-[13px] text-ink-muted">
-            {mode === "writing"
-              ? "Outreach, posts, updates, high-stakes notes."
-              : "Scope-safe change briefs for vibe-coding tools."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => setEditorOpen(true)}>
-            <Plus size={16} /> New Context Pack
+  function activePacksForRequest(req: QuickRequest): ContextPack[] {
+    const m = selectContextMix(
+      { text: req.text, mode: req.selectedMode, spaceId: req.spaceId, includeIds: req.includeIds, excludeIds: req.excludeIds },
+      packs,
+    );
+    return m.applied.map((a) => packs.find((p) => p.id === a.contextId)).filter(Boolean) as ContextPack[];
+  }
+
+  async function generateWriting(req: QuickRequest, reaction?: Reaction, parentDraftId?: string) {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setGen({ status: "loading", reaction: reaction ?? null });
+
+    const active = activePacksForRequest(req);
+    const messages = buildGenerationMessages(
+      { text: req.text, source: req.source, reactionInstruction: reaction ? reactionInstruction(reaction) : undefined },
+      active,
+    );
+    const result = await requestDraft(messages, controller.signal);
+
+    if (result.ok) {
+      ws.recordDraft({
+        id: newId("draft"),
+        requestId: req.id,
+        mode: "writing",
+        content: result.text,
+        provider: result.provider,
+        reaction,
+        activeContextIds: active.map((p) => p.id),
+        parentDraftId,
+        createdAt: nowIso(),
+      });
+      setEditBuffer(result.text);
+      setGen({ status: "idle" });
+    } else if (result.error === "not_configured") {
+      setGen({ status: "not_configured" });
+    } else if (result.error === "aborted") {
+      setGen({ status: "idle" });
+    } else {
+      setGen({ status: "error", message: errorMessage(result.error) });
+    }
+  }
+
+  function makeBrief(req: QuickRequest, reaction?: BuildReaction) {
+    const active = activePacksForRequest(req);
+    const rails = buildRailsForReaction(reaction);
+    let { prompt } = compileActive(requestToTask(req, rails), active);
+    if (reaction === "plan_first") {
+      prompt = "PLAN FIRST — return a short numbered plan and an audit of what to touch before any concrete change.\n\n" + prompt;
+    }
+    ws.recordDraft({
+      id: newId("draft"),
+      requestId: req.id,
+      mode: "build",
+      content: prompt,
+      provider: "compiler",
+      reaction,
+      activeContextIds: active.map((p) => p.id),
+      createdAt: nowIso(),
+    });
+    setEditBuffer(prompt);
+    setGen({ status: "idle" });
+  }
+
+  function run() {
+    const text = askText.trim();
+    if (!text) return;
+    const selectedMode = modeOverride ?? inferMode(text);
+    const req: QuickRequest = {
+      id: newId("req"),
+      text,
+      inferredMode: inferMode(text),
+      selectedMode,
+      spaceId: askOverrides.spaceId,
+      source: source.trim() || undefined,
+      includeIds: askOverrides.includeIds,
+      excludeIds: askOverrides.excludeIds,
+      targetTool: selectedMode === "build" ? "Claude Code" : "Claude",
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    ws.recordRequest(req);
+    setRequestId(req.id);
+    setView("result");
+    setEditBuffer("");
+    if (selectedMode === "build") makeBrief(req);
+    else generateWriting(req);
+  }
+
+  function onReact(reaction: Reaction) {
+    if (!request) return;
+    if (request.selectedMode === "build") makeBrief(request, reaction as BuildReaction);
+    else generateWriting(request, reaction, currentDraft?.id);
+  }
+
+  function onOverride(packId: string, action: "include" | "exclude" | "clear") {
+    const apply = (inc: string[], exc: string[]) => {
+      const include = new Set(inc);
+      const exclude = new Set(exc);
+      include.delete(packId);
+      exclude.delete(packId);
+      if (action === "include") include.add(packId);
+      if (action === "exclude") exclude.add(packId);
+      return { includeIds: [...include], excludeIds: [...exclude] };
+    };
+    if (isResult && request) {
+      ws.updateRequest(request.id, apply(request.includeIds, request.excludeIds));
+    } else {
+      setAskOverrides((o) => ({ ...o, ...apply(o.includeIds, o.excludeIds) }));
+    }
+  }
+
+  function onEdit(value: string) {
+    setEditBuffer(value);
+    if (currentDraft) {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      const id = currentDraft.id;
+      saveTimer.current = setTimeout(() => ws.updateDraft(id, value), 300);
+    }
+  }
+
+  function changeMode(m: Mode) {
+    if (isResult && request) {
+      ws.updateRequest(request.id, { selectedMode: m, targetTool: m === "build" ? "Claude Code" : "Claude" });
+      if (m === "build") makeBrief({ ...request, selectedMode: m });
+      else generateWriting({ ...request, selectedMode: m });
+    } else {
+      setModeOverride(m);
+    }
+  }
+
+  function copyDraft() {
+    void copyText(editBuffer);
+    toast("Copied to clipboard");
+  }
+
+  function copyPrompt() {
+    const active = request ? activePacksForRequest(request) : activePacks;
+    const text =
+      mode === "build"
+        ? editBuffer
+        : flattenMessages(buildGenerationMessages({ text: mixText, source: source.trim() || request?.source }, active));
+    void copyText(text);
+    toast("Prompt copied");
+  }
+
+  function copyForTool(tool: TargetTool) {
+    if (!request) return;
+    const active = activePacksForRequest(request);
+    const { prompt } = compileActive(requestToTask({ ...request, targetTool: tool }, buildRailsForReaction()), active);
+    void copyText(prompt);
+    toast(`Copied for ${tool}`);
+  }
+
+  function exportMarkdown() {
+    downloadText(`${slugify(mixText || "continuity")}.md`, editBuffer, "text/markdown");
+    toast("Exported Markdown");
+  }
+
+  async function useClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setSource(text);
+        setShowSource(true);
+        toast("Pulled text from clipboard");
+      }
+    } catch {
+      toast("Clipboard access was blocked");
+    }
+  }
+
+  function newRequest() {
+    abortRef.current?.abort();
+    setView("ask");
+    setRequestId(null);
+    setAskText("");
+    setSource("");
+    setShowSource(false);
+    setModeOverride(null);
+    setAskOverrides({ includeIds: [], excludeIds: [] });
+    setGen({ status: "idle" });
+    setTimeout(() => askRef.current?.focus(), 0);
+  }
+
+  const drawer = (
+    <ContextDrawer
+      open={drawerOpen}
+      onClose={() => setDrawerOpen(false)}
+      applied={mix.applied}
+      suggestions={mix.suggestions}
+      available={availablePacks}
+      source={isResult ? request?.source : source.trim() || undefined}
+      packs={packs}
+      onOverride={onOverride}
+    />
+  );
+
+  // ---------- RESULT VIEW ----------
+  if (isResult) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <ModeChip mode={mode} onChange={changeMode} />
+            <UsingLine atoms={atoms} onOpen={() => setDrawerOpen(true)} />
+          </div>
+          <Button variant="ghost" size="sm" onClick={newRequest}>
+            <Plus size={15} /> New request
           </Button>
-          <Button variant="primary" onClick={startTask}>
-            Start a {mode} task <ArrowRight size={16} />
-          </Button>
         </div>
-      </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1.6fr_1fr]">
-        {/* Recent + proposals */}
-        <div className="min-w-0 space-y-8">
-          <section className="space-y-3">
-            <SectionTitle>Recent tasks</SectionTitle>
-            {recentTasks.length === 0 ? (
-              <EmptyState
-                title="No tasks yet"
-                body="Start a task to assemble its context and compile a prompt. Your tasks are saved here so you can return to them."
-                action={
-                  <Button variant="secondary" size="sm" onClick={startTask}>
-                    Start a {mode} task
-                  </Button>
-                }
-              />
-            ) : (
-              <ul className="space-y-2">
-                {recentTasks.map((task) => (
-                  <RecentTaskRow key={task.id} task={task} activeCount={activePacks(task, ws.workspace.packs).length} />
-                ))}
-              </ul>
-            )}
-          </section>
+        <p className="rounded-md border border-rule bg-surface-sunk px-3.5 py-2.5 text-[13px] text-ink-muted">
+          {request.text}
+        </p>
 
-          {ws.proposals.length > 0 && (
-            <section className="space-y-3">
-              <SectionTitle>Suggestions</SectionTitle>
-              <div className="space-y-3">
-                {ws.proposals.map((p) => (
-                  <ProposalCard
-                    key={p.id}
-                    proposal={p}
-                    onAccept={() => ws.acceptProposal(p)}
-                    onEdit={() => handleEdit(p.payload.packId!)}
-                    onDismiss={() => ws.dismissProposal(p.id)}
-                  />
-                ))}
+        {gen.status === "not_configured" ? (
+          <NotConfigured prompt={editBuffer || promptPreview(mixText, source, request, activePacks, mode)} onCopy={copyPrompt} />
+        ) : gen.status === "loading" && !currentDraft ? (
+          <LoadingPanel onCancel={() => abortRef.current?.abort()} label={mode === "build" ? "Compiling your change brief…" : "Writing your draft…"} />
+        ) : gen.status === "error" && !currentDraft ? (
+          <ErrorPanel message={gen.message} onRetry={() => (mode === "build" ? makeBrief(request) : generateWriting(request))} />
+        ) : (
+          <>
+            <div className="overflow-hidden rounded-lg border border-rule bg-surface shadow-card">
+              <div className="flex items-center justify-between border-b border-rule px-3 py-2">
+                <span className="eyebrow inline-flex items-center gap-1.5">
+                  {gen.status === "loading" && <Loader2 size={12} className="animate-spin text-signal" />}
+                  {mode === "build" ? "Change brief" : "Draft"}
+                  {currentDraft?.provider && currentDraft.provider !== "compiler" && (
+                    <span className="text-ink-faint">· {currentDraft.provider}</span>
+                  )}
+                </span>
+                <span className="text-2xs text-ink-faint">Autosaved</span>
               </div>
-            </section>
-          )}
-        </div>
-
-        {/* Always-on rail */}
-        <div className="min-w-0 space-y-8">
-          <section className="space-y-3">
-            <SectionTitle
-              action={
-                <Link href="/packs" className="text-2xs font-medium text-signal hover:underline">
-                  All packs →
-                </Link>
-              }
-            >
-              Always on
-            </SectionTitle>
-            <div className="rounded-md border border-rule bg-surface shadow-card">
-              {alwaysOn.length === 0 ? (
-                <p className="px-4 py-4 text-[13px] text-ink-muted">
-                  Nothing is always on. Packs marked Always On are carried into every matching task.
-                </p>
-              ) : (
-                <ul className="divide-y divide-rule">
-                  {alwaysOn.map((pack) => {
-                    const accent = ACCENT[kindMeta(pack.kind).accent];
-                    return (
-                      <li key={pack.id} className="flex items-center gap-3 px-4 py-3">
-                        <KindIcon kind={pack.kind} size={15} className={accent.text} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[13px] font-medium text-ink">{pack.name}</p>
-                          <p className="truncate text-2xs text-ink-faint">{pack.summary}</p>
-                        </div>
-                        <span className="shrink-0 font-mono text-2xs text-ink-faint">
-                          {SCOPE_LABEL[pack.mode]}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+              <textarea
+                value={editBuffer}
+                onChange={(e) => onEdit(e.target.value)}
+                spellCheck={mode !== "build"}
+                aria-label={mode === "build" ? "Change brief (editable)" : "Draft (editable)"}
+                className={cx(
+                  "min-h-[20rem] w-full resize-y bg-surface px-4 py-3.5 focus:outline-none",
+                  mode === "build" ? "brief" : "text-[15px] leading-relaxed text-ink",
+                )}
+              />
             </div>
-            <p className="px-1 text-2xs leading-snug text-ink-faint">
-              Continuity selects context from your packs, tags, and choices — not hidden memory. You can
-              see and change every decision.
-            </p>
-          </section>
 
-          <section className="grid grid-cols-3 gap-2">
-            <Stat label="Packs" value={ws.workspace.packs.length} href="/packs" />
-            <Stat label="Tasks" value={ws.workspace.tasks.length} />
-            <Stat label="Saved" value={ws.workspace.artifacts.length} />
-          </section>
-        </div>
+            <ReactionRow
+              mode={mode}
+              onReact={onReact}
+              disabled={gen.status === "loading"}
+              busyReaction={gen.status === "loading" ? gen.reaction : null}
+            />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="primary" size="sm" onClick={copyDraft}>
+                <Copy size={15} /> Copy
+              </Button>
+              {mode === "build" ? (
+                BUILD_TARGETS.map((t) => (
+                  <Button key={t.tool} variant="secondary" size="sm" onClick={() => copyForTool(t.tool)}>
+                    <FileCode2 size={14} /> {t.label}
+                  </Button>
+                ))
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => generateWriting(request)}
+                  disabled={gen.status === "loading"}
+                >
+                  <RefreshCw size={14} /> Regenerate
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={copyPrompt}>
+                View prompt
+              </Button>
+              <Button variant="ghost" size="sm" onClick={exportMarkdown}>
+                Export
+              </Button>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(true)}
+                className="ml-auto text-[13px] font-medium text-signal hover:underline"
+              >
+                Adjust context
+              </button>
+            </div>
+
+            {drafts.length > 1 && (
+              <VersionHistory drafts={drafts} currentId={currentDraft?.id} onPick={(d) => setEditBuffer(d.content)} />
+            )}
+          </>
+        )}
+        {drawer}
       </div>
+    );
+  }
 
-      <PackEditor
-        open={editorOpen}
-        pack={null}
-        onClose={() => setEditorOpen(false)}
-        onSave={(values: PackDraft) => {
-          ws.createPack(values);
-          setEditorOpen(false);
-        }}
-      />
+  // ---------- ASK VIEW ----------
+  return (
+    <div className="mx-auto max-w-2xl">
+      <div className={cx(firstUse ? "pt-6 sm:pt-10" : "pt-2")}>
+        {firstUse && (
+          <h1 className="mb-5 font-display text-3xl leading-tight tracking-tight text-ink sm:text-[36px]">
+            What are you trying to make?
+          </h1>
+        )}
+
+        <div className="rounded-xl border border-rule bg-surface p-3 shadow-card focus-within:border-ink/25">
+          <textarea
+            ref={askRef}
+            autoFocus
+            value={askText}
+            onChange={(e) => setAskText(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                run();
+              }
+            }}
+            placeholder="What are you trying to make?"
+            rows={4}
+            className="w-full resize-none bg-transparent px-2 py-1.5 text-[16px] leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none"
+          />
+
+          {showSource && (
+            <textarea
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              placeholder="Paste source text to reply to or rewrite (stays on this request only)…"
+              rows={3}
+              className="mt-1 w-full resize-y rounded-md border border-rule bg-surface-sunk px-2.5 py-2 text-[13px] leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none focus-visible:outline-2 focus-visible:outline-signal"
+            />
+          )}
+
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-rule px-1 pt-2.5">
+            <ModeChip mode={mode} onChange={changeMode} />
+            <UsingLine atoms={atoms} onOpen={() => setDrawerOpen(true)} />
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={useClipboard}
+                className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-2xs font-medium text-ink-muted hover:bg-surface-sunk hover:text-ink"
+              >
+                <ClipboardPaste size={13} /> Use clipboard
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSource((s) => !s)}
+                className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-2xs font-medium text-ink-muted hover:bg-surface-sunk hover:text-ink"
+              >
+                {showSource ? <X size={13} /> : <Plus size={13} />} Source
+              </button>
+              <Button variant="primary" onClick={run} disabled={!askText.trim()}>
+                {mode === "build" ? (
+                  <>
+                    <Wand2 size={16} /> Make a change brief
+                  </>
+                ) : (
+                  <>
+                    Write it <ArrowRight size={16} />
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <p className="mt-2 px-1 text-2xs text-ink-faint">
+          {mode === "build" ? "Build Beta · " : ""}
+          Press {modifierKey()}+Enter to run · {modifierKey()}+K to focus
+        </p>
+
+        {firstUse && (
+          <div className="mt-6 space-y-2">
+            <p className="eyebrow">Try</p>
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                onClick={() => {
+                  setAskText(ex);
+                  setTimeout(() => askRef.current?.focus(), 0);
+                }}
+                className="block w-full rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left text-[14px] text-ink-muted shadow-card transition-colors hover:border-ink/20 hover:text-ink"
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!firstUse && <RecentWork onOpen={(id) => { setRequestId(id); setView("result"); }} />}
+      </div>
+      {drawer}
     </div>
   );
 }
 
-function RecentTaskRow({ task, activeCount }: { task: Task; activeCount: number }) {
+// ---------- helpers + small components ----------
+
+function usingAtoms(active: ContextPack[]): string[] {
+  return active.slice(0, 4).map((p) => (p.kind === "voice" ? "Your voice" : p.name));
+}
+
+function modifierKey(): string {
+  if (typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)) return "⌘";
+  return "Ctrl";
+}
+
+function errorMessage(error: string): string {
+  if (error === "network") return "Couldn't reach the server. Check your connection and retry.";
+  return "The provider returned an error. Try again in a moment.";
+}
+
+function promptPreview(text: string, source: string, req: QuickRequest | null, active: ContextPack[], mode: Mode): string {
+  if (mode === "build") return "";
+  return flattenMessages(buildGenerationMessages({ text, source: source.trim() || req?.source }, active));
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+    } catch {
+      /* ignore */
+    }
+    document.body.removeChild(ta);
+  }
+}
+
+function LoadingPanel({ onCancel, label }: { onCancel: () => void; label: string }) {
   return (
-    <li>
-      <Link
-        href={`/compose?task=${task.id}`}
-        className="group flex items-center gap-3 rounded-md border border-rule bg-surface px-4 py-3 shadow-card transition-colors hover:border-ink/20"
-      >
-        <FileText size={16} className="shrink-0 text-ink-faint" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-ink">{task.title || "Untitled task"}</p>
-          <p className="truncate text-2xs text-ink-faint">
-            {task.goal || "No goal yet"}
-          </p>
+    <div className="flex items-center justify-between rounded-lg border border-rule bg-surface px-4 py-8 shadow-card">
+      <span className="inline-flex items-center gap-2.5 text-sm text-ink-muted">
+        <Loader2 size={16} className="animate-spin text-signal" />
+        {label}
+      </span>
+      <Button variant="ghost" size="sm" onClick={onCancel}>
+        Cancel
+      </Button>
+    </div>
+  );
+}
+
+function ErrorPanel({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="rounded-lg border border-rust/30 bg-rust-soft px-4 py-4">
+      <p className="text-sm text-rust-ink">{message}</p>
+      <div className="mt-3">
+        <Button variant="secondary" size="sm" onClick={onRetry}>
+          <RefreshCw size={14} /> Try again
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function NotConfigured({ prompt, onCopy }: { prompt: string; onCopy: () => void }) {
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-signal/30 bg-signal-soft px-4 py-3.5">
+        <p className="text-[13px] font-medium text-signal-ink">Direct drafting needs a server-side AI provider key.</p>
+        <p className="mt-1 text-2xs leading-relaxed text-signal-ink/80">
+          Set <code className="font-mono">ANTHROPIC_API_KEY</code> (or <code className="font-mono">OPENAI_API_KEY</code>) in
+          your environment and reload. Nothing is faked — until a provider is configured, here is the exact prompt
+          Continuity assembled, ready to paste into ChatGPT or Claude.
+        </p>
+      </div>
+      <div className="overflow-hidden rounded-lg border border-rule bg-surface shadow-card">
+        <div className="flex items-center justify-between border-b border-rule px-3 py-2">
+          <span className="eyebrow">Compiled prompt</span>
+          <Button variant="primary" size="sm" onClick={onCopy}>
+            <Copy size={14} /> Copy prompt
+          </Button>
         </div>
-        <div className="hidden shrink-0 items-center gap-2 sm:flex">
-          <span
+        <pre className="brief max-h-[24rem] overflow-auto px-4 py-3.5">{prompt}</pre>
+      </div>
+    </div>
+  );
+}
+
+function VersionHistory({
+  drafts,
+  currentId,
+  onPick,
+}: {
+  drafts: Draft[];
+  currentId?: string;
+  onPick: (d: Draft) => void;
+}) {
+  return (
+    <div className="rounded-md border border-rule bg-surface px-3 py-2.5 shadow-card">
+      <p className="eyebrow mb-2">Versions</p>
+      <div className="flex flex-wrap gap-1.5">
+        {drafts.map((d, i) => (
+          <button
+            key={d.id}
+            type="button"
+            onClick={() => onPick(d)}
             className={cx(
-              "rounded-sm px-1.5 py-0.5 font-mono text-2xs uppercase tracking-[0.08em]",
-              task.mode === "writing" ? "bg-signal-soft text-signal-ink" : "bg-rust-soft text-rust-ink",
+              "rounded px-2 py-1 text-2xs font-medium transition-colors",
+              d.id === currentId ? "bg-ink text-paper" : "bg-surface-sunk text-ink-muted hover:text-ink",
             )}
           >
-            {task.mode}
-          </span>
-          <span className="tabular font-mono text-2xs text-ink-faint">{activeCount} active</span>
-        </div>
-        <ArrowRight size={15} className="shrink-0 text-ink-faint transition-transform group-hover:translate-x-0.5" />
-      </Link>
-    </li>
+            {i === 0 ? "Latest" : d.reaction ? labelFor(d.reaction) : `v${drafts.length - i}`}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
-function Stat({ label, value, href }: { label: string; value: number; href?: string }) {
-  const inner = (
-    <div className="rounded-md border border-rule bg-surface px-3 py-3 text-center shadow-card">
-      <div className="tabular font-display text-2xl text-ink">{value}</div>
-      <div className="eyebrow mt-0.5">{label}</div>
+function labelFor(reaction: Reaction): string {
+  return reaction.replace(/_/g, " ");
+}
+
+function RecentWork({ onOpen }: { onOpen: (requestId: string) => void }) {
+  const ws = useWorkspace();
+  const recent = [...ws.workspace.requests]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 4);
+  if (!recent.length) return null;
+  return (
+    <div className="mt-8 space-y-2">
+      <p className="eyebrow">Recent</p>
+      {recent.map((r) => (
+        <button
+          key={r.id}
+          type="button"
+          onClick={() => onOpen(r.id)}
+          className="flex w-full items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left shadow-card transition-colors hover:border-ink/20"
+        >
+          <span
+            className={cx(
+              "shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-2xs uppercase",
+              r.selectedMode === "build" ? "bg-rust-soft text-rust-ink" : "bg-signal-soft text-signal-ink",
+            )}
+          >
+            {r.selectedMode}
+          </span>
+          <span className="truncate text-[13px] text-ink-muted">{r.text}</span>
+        </button>
+      ))}
     </div>
-  );
-  return href ? (
-    <Link href={href} className="block transition-colors hover:opacity-80">
-      {inner}
-    </Link>
-  ) : (
-    inner
   );
 }

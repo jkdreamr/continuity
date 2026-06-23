@@ -1,94 +1,96 @@
 # Continuity
 
-**Decide what your AI knows — before it writes or builds.**
+**Type what you need. Continuity carries the rest.**
 
-Continuity is a local-first web app for assembling the right context _before_ you prompt an AI tool. Instead of re-pasting the same background on every task, you keep your voice, project facts, audience, references, decisions, and constraints as visible, reusable **Context Packs**. Start a task, see exactly which context is active and why, tune a few plain-English controls, and copy a sharper, task-specific prompt.
+Continuity is a local-first **personal creation layer** for writing and building with AI. You type one natural-language request; Continuity quietly applies your approved voice, project, and guardrails, tells you exactly what it used, and hands back an editable draft — no task forms, no prompt assembly, no copy-paste ritual.
 
-It has two surfaces powered by one engine:
+Two surfaces, one engine:
 
-- **Writing** — outreach, posts, updates, high-stakes notes (the primary, polished workflow).
-- **Build (Beta)** — scope-safe change briefs for vibe-coding tools (Claude Code, Lovable, …).
+- **Writing** (default) — produces a finished, editable **draft** in-app via a server-side AI provider.
+- **Build (Beta)** — produces a scope-safe **change brief** to copy into Claude Code, Lovable, or a generic builder.
 
-> Continuity compiles a better prompt for **you** to paste. It never calls a model, has no accounts, and collects nothing in the background. Everything stays in your browser unless you export it.
+> Continuity chooses defaults and removes form-filling, but **automatic ≠ invisible**: every applied piece of context shows a plain-language reason and can be turned off in one tap. No background clipboard reads, no page scraping, no hidden memory.
 
 ---
 
-## What makes it different
+## The loop
 
-- **Inspectable, not invisible.** Every active piece of context shows its type, scope, and a one-line reason it was included — and what was left out and why.
-- **Deterministic selection.** Hard mode boundaries first, then activation and tag overlap. No hidden similarity, no autonomous memory.
-- **Rails that mean something.** Each intent rail maps to documented compiler behaviour; moving it visibly changes the compiled prompt.
-- **The Context Thread.** A signature visual that threads each active pack down into the compiled output, so you can see your decisions being carried forward.
+**Writing:** `Ask → Draft → React`
+Type → **Write it** → edit the draft or tap a reaction (Shorter, Warmer, More like me, More direct, Less polished, Reframe).
+
+**Build:** `Ask → Change Brief → Copy / Continue`
+Type → **Make a change brief** → Copy for Claude Code / Lovable, or refine (Safer, Bolder, More editorial, Keep structure, Plan first).
+
+The whole primary writing flow is **at most two deliberate actions** after typing: click *Write it*, then copy or react.
+
+### Keyboard
+- `Cmd/Ctrl + Enter` — run the request
+- `Cmd/Ctrl + K` — focus the ask field
+- `Enter` — newline
 
 ---
 
 ## Local setup
 
-Requires Node.js 18.18+ (developed on Node 22). No API keys, no internet needed after install.
+Requires Node.js 18.18+ (developed on Node 22).
 
 ```bash
-npm install      # install dependencies
-npm run dev      # start the dev server at http://localhost:3000
+npm install
+cp .env.example .env.local   # optional — add a provider key for direct drafting
+npm run dev                  # http://localhost:3000
 ```
 
-On first run the app seeds a fictional demo workspace (the "Continuity" startup) so every screen is populated. Reset or clear it anytime from **Settings**.
+On first run the app seeds a small demo Library so every surface is populated. Reset or clear it from **Settings**.
 
-## App commands
+### AI provider (required for Writing drafts)
 
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Start the development server (http://localhost:3000) |
-| `npm run build` | Production build |
-| `npm start` | Serve the production build |
-| `npm run lint` | ESLint (`next/core-web-vitals`) |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run test` | Run the unit-test suite once (Vitest) |
-| `npm run test:watch` | Run tests in watch mode |
+Direct drafting needs a **server-side** provider key. Set one of these as an environment variable (in `.env.local` locally, or in your Vercel project settings):
 
-## Test commands
+| Variable | Required? | Notes |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | one key required | Recommended provider |
+| `OPENAI_API_KEY` | (alternative) | Used if Anthropic isn't set |
+| `AI_PROVIDER` | optional | `anthropic` \| `openai` to force a choice |
+| `ANTHROPIC_MODEL` | optional | defaults to `claude-sonnet-4-6` |
+| `OPENAI_MODEL` | optional | defaults to `gpt-4o-mini` |
 
-Core logic is covered by Vitest (38 tests across selection, compilation, rails, export/import, and memory proposals):
-
-```bash
-npm run test          # one-shot
-npm run test:watch    # watch mode
-```
-
-The required compiler behaviours (always-on inclusion, mode boundaries, manual-exclusion overrides, required constraints, rail language, safe-build non-change constraints, export/import round-trips, graceful invalid-import handling) each have dedicated tests under `tests/`.
+- Keys are read **only on the server** (`src/lib/server/`) and never sent to the browser. Do **not** use a `NEXT_PUBLIC_` prefix.
+- **No provider = no fake output.** If no key is configured, Continuity shows an honest "not configured" state and still assembles + lets you copy the exact prompt. Build mode (change briefs) works fully without any key.
 
 ---
 
-## Data & persistence model
+## Commands
 
-- **Local-first.** Your entire workspace — packs, tasks, and saved outputs — lives in your browser's `localStorage` under the key `continuity.workspace.v1`. There is no server and no database.
-- **SSR-safe.** The store hydrates from `localStorage` on mount (seeding the demo if empty), so there are no hydration mismatches.
-- **Validated.** Saved and imported data is validated at runtime with Zod (`src/lib/schema.ts`); malformed data is rejected with a friendly message rather than corrupting state.
-- **Portable & disposable.** Export your workspace as JSON (Settings) or any compiled task as Markdown (Composer). Reset the demo or clear everything from Settings — clearing is confirmed and irreversible.
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server (http://localhost:3000) |
+| `npm run build` | Production build |
+| `npm start` | Serve the production build |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run test` | Vitest (67 tests) |
+| `npm run test:watch` | Vitest watch mode |
 
-### Domain model (core types — `src/types/continuity.ts`)
+Core logic is covered by tests under `tests/`: mode inference, context selection, reactions, provider configuration, migration, autosave, and the V4 compiler.
 
-```ts
-type Mode = "writing" | "build";
-type PackKind = "voice" | "project" | "audience" | "reference" | "constraint" | "decision" | "taste";
+---
 
-type ContextPack = {
-  id; name; kind; mode: Mode | "both"; summary; details; tags: string[];
-  priority: "required" | "preferred" | "optional";
-  activation: "always_on" | "suggested" | "manual";
-  createdAt; updatedAt;
-};
+## Data, persistence & migrations
 
-type Task = {
-  id; mode; title; goal; audience; destination; notes; tags: string[];
-  includePackIds: string[];   // manually switched ON for this task
-  excludePackIds: string[];   // manually switched OFF for this task
-  rails: Record<string, number>;
-  targetTool: "ChatGPT" | "Claude" | "Claude Code" | "Lovable" | "Generic";
-  createdAt; updatedAt;
-};
+- **Local-first.** Packs, requests, and drafts live in `localStorage` under `continuity.workspace.v1`. No server database; the only network call is the stateless generation request.
+- **Versioned migration.** On load the workspace is run through `migrateWorkspace` (`src/lib/migrate.ts`). V4 data (`version: 1`) upgrades **in place** to V5 (`version: 2`) — existing packs, tasks, and artifacts are preserved and the new `requests`/`drafts` arrays are added. Migration is idempotent and non-destructive; old exports import cleanly.
+- **Autosave.** Requests and drafts save automatically (no "Save" button). Each request keeps a draft version history.
+- **Portable.** Export the whole workspace as JSON, or any draft as Markdown (Settings / result view). Reset the demo or clear everything from Settings.
 
-type OutputArtifact = { id; taskId; mode; targetTool; prompt; activePackIds: string[]; createdAt };
-```
+---
+
+## Privacy model
+
+- **Stays local:** everything you create stays in your browser.
+- **Sent per generation:** only your request, the handful of approved context items shown in the *Using* line, and any source text you explicitly pasted — never your whole Library.
+- **Never collected:** no background clipboard reads, no tab/DOM/form scraping, no hidden memory. Clipboard and pasted source are used only on an explicit click and stay on that request unless you save them.
+
+Settings shows a live data-flow ledger and the provider connection status (never the key itself).
 
 ---
 
@@ -96,17 +98,31 @@ type OutputArtifact = { id; taskId; mode; targetTool; prompt; activePackIds: str
 
 ```
 src/
-  app/            # Next.js App Router pages: / , /compose , /packs , /settings
-  components/
-    continuity/   # domain components (Context Thread, pack editor, rails, decisions…)
-    ui/           # primitives (Button, Field, Drawer, ConfirmDialog, Toast)
-  lib/            # pure, tested logic: selection, compile, rails, memory, storage, schema
-  data/           # seed workspace
-  types/          # domain types
-tests/            # Vitest unit tests
-docs/             # mvp-scope.md
+  app/
+    page.tsx              # Now — the ask → draft → react surface
+    library/              # Library — your voice, spaces, keep true, visual direction
+    settings/             # Data control, provider status, privacy
+    api/generate/         # Server-side generation route (key never leaves the server)
+    api/provider-status/  # Reports configured/provider/model — never the key
+  components/continuity/   # Now composer, context drawer, mode chip, using line, reactions…
+  components/ui/           # Button, Field, Drawer, ConfirmDialog, Toast
+  lib/
+    inferMode · contextMix · reactions · generationPrompt · generateClient
+    requestTask · requests · migrate · compile · selection · rails · …
+    server/                # provider adapter + config (server-only)
+  data/                    # seed Library
+  types/                   # domain model
+tests/                     # Vitest unit tests
+docs/                      # mvp-scope.md · v5-product-reset.md
 ```
 
 ## Stack
 
-Next.js 14 (App Router) · TypeScript · Tailwind CSS · Zod · Vitest · lucide-react. Type system: Newsreader (editorial serif) + IBM Plex Sans / IBM Plex Mono, self-hosted via `next/font`.
+Next.js 14 (App Router) · TypeScript · Tailwind CSS · Zod · Vitest · lucide-react. Typeface: Newsreader (editorial serif) + IBM Plex Sans / Mono, self-hosted via `next/font`.
+
+## Known limitations
+
+- Single-browser persistence (move data via Settings → Export/Import). No cloud sync.
+- Writing drafts require a configured provider key; without one, you get the prompt to paste elsewhere (Build works fully offline).
+- Context selection is deterministic and conservative by design — no embeddings/semantic retrieval in this iteration.
+- No browser extension yet (the generation + context boundaries are built to make one possible later).

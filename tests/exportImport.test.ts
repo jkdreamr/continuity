@@ -5,7 +5,7 @@ import { makePack, makeTask } from "./fixtures";
 
 function sampleWorkspace(): Workspace {
   return {
-    version: 1,
+    version: 2,
     packs: [makePack({ id: "p1", kind: "voice", mode: "writing" })],
     tasks: [makeTask({ id: "t1", mode: "writing" })],
     artifacts: [
@@ -19,6 +19,8 @@ function sampleWorkspace(): Workspace {
         createdAt: "2026-06-01T00:00:00.000Z",
       },
     ],
+    requests: [],
+    drafts: [],
     dismissedProposals: [],
     seededDemo: true,
   };

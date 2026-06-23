@@ -193,8 +193,8 @@ function render(task: Task, sections: Section[]): string {
   return [header, body, footer].filter(Boolean).join("\n\n");
 }
 
-export function compile(task: Task, allPacks: ContextPack[]): CompiledPrompt {
-  const active = activePacks(task, allPacks);
+/** Compile from an explicit active set (used by the V5 context mix). */
+export function compileActive(task: Task, active: ContextPack[]): CompiledPrompt {
   const sections =
     task.mode === "build" ? buildBuildSections(task, active) : buildWritingSections(task, active);
   return {
@@ -202,6 +202,10 @@ export function compile(task: Task, allPacks: ContextPack[]): CompiledPrompt {
     activePackIds: active.map((p) => p.id),
     sections,
   };
+}
+
+export function compile(task: Task, allPacks: ContextPack[]): CompiledPrompt {
+  return compileActive(task, activePacks(task, allPacks));
 }
 
 export { WRITING_RAILS, BUILD_RAILS };

@@ -5,10 +5,12 @@ import { makePack, makeTask } from "./fixtures";
 
 function ws(partial: Partial<Workspace>): Workspace {
   return {
-    version: 1,
+    version: 2,
     packs: [],
     tasks: [],
     artifacts: [],
+    requests: [],
+    drafts: [],
     dismissedProposals: [],
     seededDemo: false,
     ...partial,

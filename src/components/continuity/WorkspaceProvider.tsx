@@ -11,18 +11,22 @@ import {
 } from "react";
 import type {
   ContextPack,
+  Draft,
   Mode,
   MemoryProposal,
   OutputArtifact,
   PackKind,
   PackScope,
+  QuickRequest,
   Task,
   Workspace,
 } from "@/types/continuity";
+import type { ProviderStatus } from "@/lib/server/providerConfig";
 import { newId, nowIso } from "@/lib/id";
 import { defaultRails } from "@/lib/rails";
 import { compile } from "@/lib/compile";
 import { generateProposals } from "@/lib/memory";
+import { recordRequest as appendRequest, recordDraft as appendDraft } from "@/lib/requests";
 import { exportWorkspace, parseImport, type ImportResult } from "@/lib/exportImport";
 import { loadWorkspace, saveWorkspace, clearWorkspace } from "@/lib/storage";
 import { buildSeedWorkspace, emptyWorkspace } from "@/data/seed";
@@ -48,6 +52,13 @@ type WorkspaceApi = {
   acceptProposal: (proposal: MemoryProposal) => void;
   dismissProposal: (id: string) => void;
 
+  // V5
+  providerStatus: ProviderStatus | null;
+  recordRequest: (req: QuickRequest) => void;
+  updateRequest: (id: string, patch: Partial<QuickRequest>) => void;
+  recordDraft: (draft: Draft) => void;
+  updateDraft: (id: string, content: string) => void;
+
   exportText: () => string;
   importText: (text: string) => ImportResult;
   resetDemo: () => void;
@@ -66,11 +77,24 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   // hydration mismatch; real data arrives in the mount effect below.
   const [workspace, setWorkspace] = useState<Workspace>(() => emptyWorkspace());
   const [hydrated, setHydrated] = useState(false);
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
 
   useEffect(() => {
     const loaded = loadWorkspace();
     setWorkspace(loaded ?? buildSeedWorkspace());
     setHydrated(true);
+  }, []);
+
+  // Ask the server (never the client) whether a provider key is configured.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/provider-status")
+      .then((r) => (r.ok ? r.json() : { configured: false }))
+      .then((s: ProviderStatus) => alive && setProviderStatus(s))
+      .catch(() => alive && setProviderStatus({ configured: false }));
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // Debounced persistence so per-keystroke edits don't thrash localStorage.
@@ -236,6 +260,30 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     [workspace.tasks, workspace.packs],
   );
 
+  const recordRequest = useCallback<WorkspaceApi["recordRequest"]>((req) => {
+    setWorkspace((ws) => appendRequest(ws, req));
+  }, []);
+
+  const updateRequest = useCallback<WorkspaceApi["updateRequest"]>((id, patch) => {
+    setWorkspace((ws) => ({
+      ...ws,
+      requests: ws.requests.map((r) =>
+        r.id === id ? { ...r, ...patch, updatedAt: nowIso() } : r,
+      ),
+    }));
+  }, []);
+
+  const recordDraft = useCallback<WorkspaceApi["recordDraft"]>((draft) => {
+    setWorkspace((ws) => appendDraft(ws, draft));
+  }, []);
+
+  const updateDraft = useCallback<WorkspaceApi["updateDraft"]>((id, content) => {
+    setWorkspace((ws) => ({
+      ...ws,
+      drafts: ws.drafts.map((d) => (d.id === id ? { ...d, content } : d)),
+    }));
+  }, []);
+
   const proposals = useMemo(() => generateProposals(workspace), [workspace]);
 
   const acceptProposal = useCallback<WorkspaceApi["acceptProposal"]>((proposal) => {
@@ -315,6 +363,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       proposals,
       acceptProposal,
       dismissProposal,
+      providerStatus,
+      recordRequest,
+      updateRequest,
+      recordDraft,
+      updateDraft,
       exportText,
       importText,
       resetDemo,
@@ -336,6 +389,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       proposals,
       acceptProposal,
       dismissProposal,
+      providerStatus,
+      recordRequest,
+      updateRequest,
+      recordDraft,
+      updateDraft,
       exportText,
       importText,
       resetDemo,

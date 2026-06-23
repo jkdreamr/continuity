@@ -6,8 +6,8 @@ import { cx } from "@/lib/cx";
 import { Logo } from "@/components/continuity/Logo";
 
 const NAV = [
-  { href: "/", label: "Workspace" },
-  { href: "/packs", label: "Context Packs" },
+  { href: "/", label: "Now" },
+  { href: "/library", label: "Library" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -15,7 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   function isActive(href: string) {
-    if (href === "/") return pathname === "/" || pathname.startsWith("/compose");
+    if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   }
 

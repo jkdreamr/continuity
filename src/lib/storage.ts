@@ -1,5 +1,5 @@
 import type { Workspace } from "@/types/continuity";
-import { WorkspaceSchema } from "@/lib/schema";
+import { migrateWorkspace } from "@/lib/migrate";
 
 export const STORAGE_KEY = "continuity.workspace.v1";
 
@@ -7,14 +7,16 @@ export function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
-/** Read + validate the saved workspace. Returns null when absent or invalid. */
+/**
+ * Read + migrate the saved workspace. Runs the versioned migration so V4 (v1)
+ * data upgrades in place. Returns null when absent or unrecoverable.
+ */
 export function loadWorkspace(): Workspace | null {
   if (!isBrowser()) return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = WorkspaceSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
+    return migrateWorkspace(JSON.parse(raw));
   } catch {
     return null;
   }
