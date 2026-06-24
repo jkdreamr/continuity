@@ -1,4 +1,5 @@
-import type { DocumentBrief, DocumentInsight } from "@/types/continuity";
+import type { ContractItem, DocumentBrief, DocumentInsight } from "@/types/continuity";
+import type { TuneVector } from "@/lib/writing/autoTune/types";
 
 /**
  * Client transport for the writing agent. Each call aborts via the caller's
@@ -53,4 +54,46 @@ export async function requestTransform(
 ): Promise<{ ok: true; replacement: string; baseSelectionHash?: string } | { ok: false; error: AgentError }> {
   const r = await post<{ replacement: string; baseSelectionHash?: string }>("/api/writing/transform-selection", payload, signal);
   return r.ok ? { ok: true, replacement: r.data.replacement, baseSelectionHash: r.data.baseSelectionHash } : { ok: false, error: r.error };
+}
+
+/**
+ * Stream a live-Tune rewrite as plain text. `onChunk` receives the accumulated
+ * text as it arrives so the editor can patch the visible selection incrementally.
+ */
+export async function streamTune(
+  payload: {
+    selection: string;
+    before?: string;
+    after?: string;
+    vector: TuneVector;
+    brief?: DocumentBrief;
+    contract?: ContractItem[];
+    voiceSummary?: string;
+  },
+  signal: AbortSignal,
+  onChunk: (accumulated: string) => void,
+): Promise<{ ok: true; text: string } | { ok: false; error: AgentError }> {
+  try {
+    const res = await fetch("/api/writing/tune-stream", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    });
+    if (res.status === 503) return { ok: false, error: "not_configured" };
+    if (!res.ok || !res.body) return { ok: false, error: "provider_error" };
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+      onChunk(text);
+    }
+    return { ok: true, text: text.trim() };
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") return { ok: false, error: "aborted" };
+    return { ok: false, error: "network" };
+  }
 }

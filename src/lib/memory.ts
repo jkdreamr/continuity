@@ -1,7 +1,7 @@
 import type { ContextPack, MemoryProposal, Task, Workspace } from "@/types/continuity";
 
 /**
- * Memory proposals are derived *only* from saved choices — never from hidden
+ * Memory proposals are derived *only* from saved choices, never from hidden
  * inference. Every proposal is something the user can point at in their own
  * history ("you added this twice", "you removed this from a writing task").
  * The UI labels them "Suggested from your saved choices" and requires an

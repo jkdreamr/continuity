@@ -3,7 +3,7 @@ import type { DocumentBrief } from "@/types/continuity";
 /**
  * System instructions for the writing agent (from the V7 thesis §12). Kept small,
  * structured, and bounded. The provider must return validated structured data or
- * an honest null — never a fabricated draft.
+ * an honest null, never a fabricated draft.
  */
 
 export const COMPLETION_SYSTEM = `You are a conservative prose completion engine. Continue only the user's current thought.
@@ -39,7 +39,7 @@ function briefLine(brief?: DocumentBrief): string {
     brief.tone?.length && `tone: ${brief.tone.join(", ")}`,
     brief.goal && `goal: ${brief.goal}`,
   ].filter(Boolean);
-  return `Document brief — ${bits.join("; ")}.`;
+  return `Document brief, ${bits.join("; ")}.`;
 }
 
 export function buildCompletionUser(input: {

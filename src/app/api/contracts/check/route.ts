@@ -17,7 +17,7 @@ const Body = z.object({
 /**
  * Continuity Check. The deterministic receipt is always produced (honest, works
  * with no key). When a provider IS configured, its extracted items enrich the
- * receipt — but a provider failure silently falls back to the baseline rather
+ * receipt, but a provider failure silently falls back to the baseline rather
  * than erroring, because the deterministic result is genuinely useful on its own.
  */
 export async function POST(req: Request) {

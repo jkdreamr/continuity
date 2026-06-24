@@ -56,7 +56,7 @@ export default function SettingsPage() {
       <PageHeader
         eyebrow="Data control"
         title="Settings"
-        lede="Continuity is local-first. Everything you create lives in this browser — you can take it with you or wipe it at any time."
+        lede="Everything you make stays in this browser. Take it with you, or wipe it anytime."
       />
 
       <div className="flex items-start gap-3 rounded-md border border-green/30 bg-green-soft px-4 py-3.5">
@@ -66,8 +66,8 @@ export default function SettingsPage() {
             Your workspace stays in this browser unless you export it.
           </p>
           <p className="mt-0.5 text-2xs leading-snug text-green-ink/80">
-            No account, no server, no background collection. Context is selected from the packs and
-            choices you can see — nothing hidden.
+            No account, no server, no background collection. Context comes from packs and choices you
+            can see. Nothing hidden.
           </p>
         </div>
       </div>
@@ -104,7 +104,7 @@ export default function SettingsPage() {
             Set <code className="font-mono">ANTHROPIC_API_KEY</code> or{" "}
             <code className="font-mono">OPENAI_API_KEY</code> (optionally{" "}
             <code className="font-mono">AI_PROVIDER</code> and a model) in your environment, then reload. Until then,
-            Continuity still assembles and lets you copy the exact prompt — it never fakes a draft.
+            Continuity still builds the exact prompt for you to copy. It never fakes a draft.
           </p>
         )}
       </Card>
@@ -125,7 +125,7 @@ export default function SettingsPage() {
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-signal" />
             <span>
               <strong className="text-ink">Sent per generation:</strong> only your request, the handful of approved
-              context items shown in the &ldquo;Using&rdquo; line, and any source text you pasted — never your whole
+              context items shown in the &ldquo;Using&rdquo; line, and any source text you pasted, never your whole
               Library.
             </span>
           </li>
@@ -145,12 +145,20 @@ export default function SettingsPage() {
               are never auto-applied, and no inference becomes durable without your confirmation.
             </span>
           </li>
+          <li className="flex gap-2">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ink" />
+            <span>
+              <strong className="text-ink">Tune:</strong> sends only the selected passage and a little surrounding or
+              approved context to your model. Never the whole document, and a one-off adjustment is never saved as a
+              preference.
+            </span>
+          </li>
         </ul>
       </Card>
 
       <Card
         title="Export"
-        body="Download your entire workspace as a JSON file — packs, tasks, and saved outputs. Human-readable and yours to keep."
+        body="Download your entire workspace as a JSON file, packs, tasks, and saved outputs. Human-readable and yours to keep."
       >
         <Button variant="secondary" onClick={exportJson}>
           <Download size={15} /> Export workspace (JSON)
@@ -194,7 +202,7 @@ export default function SettingsPage() {
 
       <Card
         title="Reset demo workspace"
-        body="Restore the seeded Continuity demo — the sample packs, tasks, and suggestions. Useful for a clean walkthrough."
+        body="Restore the seeded Continuity demo, the sample packs, tasks, and suggestions. Useful for a clean walkthrough."
       >
         <Button variant="secondary" onClick={() => setConfirmReset(true)}>
           <RotateCcw size={15} /> Reset demo data
@@ -203,7 +211,7 @@ export default function SettingsPage() {
 
       <Card
         title="Clear all local data"
-        body="Permanently delete everything in this browser — all packs, tasks, and outputs. Export first if you want to keep a copy."
+        body="Permanently delete everything in this browser, all packs, tasks, and outputs. Export first if you want to keep a copy."
         danger
       >
         <Button variant="danger" onClick={() => setConfirmClear(true)}>

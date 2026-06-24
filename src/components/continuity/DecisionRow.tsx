@@ -68,8 +68,8 @@ export function DecisionRow({
         </RowButton>
       )}
       {unavailable && (
-        <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.08em] text-ink-faint">
-          <Ban size={12} /> off-scope
+        <span className="inline-flex items-center gap-1 text-2xs font-medium text-ink-faint">
+          <Ban size={12} /> Off-scope
         </span>
       )}
     </div>

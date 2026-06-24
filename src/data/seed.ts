@@ -4,7 +4,7 @@ import { defaultRails } from "@/lib/rails";
 
 /**
  * Fictional but realistic demo workspace for the "Continuity" startup itself.
- * All copy is real interface language — no lorem ipsum, no personal data.
+ * All copy is real interface language, no lorem ipsum, no personal data.
  * The two seed tasks intentionally create an honest memory proposal:
  *   - "Continuity product thesis" was added by hand to 2 tasks  -> offer Always On
  *   - "Calm editorial control room" was removed from a writing task -> offer Build-only
@@ -35,7 +35,7 @@ function seedPacks(): ContextPack[] {
       summary:
         "A visible, portable Context Pack system that helps creators carry voice, decisions, and constraints into AI work.",
       details:
-        "Writing-first wedge; Build stays a controlled beta. Positioning: control what AI knows for each task — not universal memory, not a prompt app. Local-first and inspectable.",
+        "Writing-first wedge; Build stays a controlled beta. Positioning: control what AI knows for each task, not universal memory, not a prompt app. Local-first and inspectable.",
       tags: ["continuity", "product", "strategy"],
       priority: "required",
       activation: "suggested",

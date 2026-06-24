@@ -14,10 +14,10 @@ export type ContractKindMeta = {
 
 const META: Record<ContractItemKind, ContractKindMeta> = {
   approved_fact: { noun: "Fact", accent: "ink", hint: "Something you've stated as true." },
-  decision: { noun: "Decision", accent: "signal", hint: "A choice already made — don't contradict it." },
+  decision: { noun: "Decision", accent: "signal", hint: "A choice already made, don't contradict it." },
   commitment: { noun: "Commitment", accent: "rust", hint: "A promise you'll be held to." },
   constraint: { noun: "Guardrail", accent: "rust", hint: "Something that must stay true." },
-  open_question: { noun: "Open question", accent: "ink", hint: "Unknown — must not be fabricated." },
+  open_question: { noun: "Open question", accent: "ink", hint: "Unknown, must not be fabricated." },
   relationship_note: { noun: "Relationship", accent: "green", hint: "Who this is for, and how you relate." },
   tone_rule: { noun: "Tone", accent: "green", hint: "How this should sound." },
 };

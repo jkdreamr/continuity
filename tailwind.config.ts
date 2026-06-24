@@ -15,7 +15,7 @@ const config: Config = {
         ink: {
           DEFAULT: "#101419",
           muted: "#5A6472",
-          faint: "#8A94A3",
+          faint: "#646E7C",
         },
         paper: "#F7F8F9",
         surface: {
@@ -43,12 +43,14 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-plex-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["var(--font-plex-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
-        display: ["var(--font-newsreader)", "Georgia", "serif"],
+        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
+        // Headings share the sans now; hierarchy comes from weight + size.
+        display: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       fontSize: {
-        "2xs": ["0.6875rem", { lineHeight: "1rem", letterSpacing: "0.04em" }],
+        // Nudged up from 0.6875rem for legibility; the app leaned on tiny labels.
+        "2xs": ["0.75rem", { lineHeight: "1.1rem", letterSpacing: "0.01em" }],
       },
       borderRadius: {
         sm: "3px",

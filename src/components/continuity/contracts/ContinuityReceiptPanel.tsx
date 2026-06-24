@@ -6,7 +6,7 @@ import { ACCENT } from "@/lib/accent";
 import { receiptToMarkdown } from "@/lib/contracts/generateContinuityReceipt";
 
 /**
- * The Continuity Receipt — always five sections, in a fixed order:
+ * The Continuity Receipt, always five sections, in a fixed order:
  *   Context used · Commitments created · Assumptions made ·
  *   Potential contradictions · What should carry forward.
  * It makes a piece of AI work accountable to the contract: what it relied on,
@@ -24,7 +24,7 @@ function ItemLine({ item, onSave }: { item: ContractItem; onSave?: () => void })
   const accent = ACCENT[meta.accent];
   return (
     <li className="flex items-start gap-2 py-1">
-      <span className={cx("mt-0.5 shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em]", accent.soft)}>
+      <span className={cx("mt-0.5 shrink-0 rounded-sm px-1.5 py-0.5 text-2xs font-medium", accent.soft)}>
         {meta.noun}
       </span>
       <span className="flex-1 text-[13px] leading-relaxed text-ink">{item.statement}</span>
@@ -86,7 +86,7 @@ export function ContinuityReceiptPanel({
     try {
       await navigator.clipboard.writeText(md);
     } catch {
-      /* clipboard blocked — no-op */
+      /* clipboard blocked, no-op */
     }
   }
 
@@ -131,7 +131,7 @@ export function ContinuityReceiptPanel({
       >
         {receipt.contradictions.map((c) => (
           <li key={c.id} className="flex items-start gap-2 py-1">
-            <span className={cx("mt-0.5 inline-flex shrink-0 items-center gap-0.5 rounded-sm px-1.5 py-0.5 font-mono text-[10px] uppercase", SEVERITY[c.severity])}>
+            <span className={cx("mt-0.5 inline-flex shrink-0 items-center gap-0.5 rounded-sm px-1.5 py-0.5 text-2xs font-medium capitalize", SEVERITY[c.severity])}>
               <AlertTriangle size={10} /> {c.severity}
             </span>
             <span className="flex-1 text-[13px] leading-relaxed text-ink">

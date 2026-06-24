@@ -5,7 +5,7 @@ import { cx } from "@/lib/cx";
 import { contractKindMeta, APPLY_POLICY_LABEL } from "@/lib/contracts/contractMeta";
 
 /**
- * One inspectable contract item — kind, the statement, its confidence, how it
+ * One inspectable contract item, kind, the statement, its confidence, how it
  * may be applied, and whether it's sensitive. Optional accept/reject actions let
  * a proposed item be promoted to active or dismissed.
  */
@@ -29,7 +29,7 @@ export function ContractItemCard({
       <div className="flex items-start justify-between gap-2">
         <span
           className={cx(
-            "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-2xs uppercase tracking-[0.08em]",
+            "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-2xs font-medium",
             accent.soft,
           )}
         >
@@ -37,7 +37,7 @@ export function ContractItemCard({
         </span>
         <span className="inline-flex items-center gap-1.5 font-mono text-2xs text-ink-faint">
           {sensitive && (
-            <span className="inline-flex items-center gap-0.5 text-rust-ink" title="Sensitive — never auto-applied">
+            <span className="inline-flex items-center gap-0.5 text-rust-ink" title="Sensitive, never auto-applied">
               <Lock size={10} /> sensitive
             </span>
           )}

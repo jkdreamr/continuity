@@ -1,6 +1,6 @@
 /**
  * Deterministic gating for ghost completion. The provider call only fires when
- * ALL gates pass — this is where "do not interrupt" is enforced, independent of
+ * ALL gates pass, this is where "do not interrupt" is enforced, independent of
  * the idle timer in the editor extension.
  */
 

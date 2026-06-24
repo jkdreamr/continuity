@@ -5,7 +5,7 @@ import type { ContextPack, PackDecision, Task } from "@/types/continuity";
  *
  * Order matters and mirrors the thesis assembly algorithm: hard boundaries
  * (mode scope) are applied *first*, before any activation logic. There is no
- * semantic similarity or hidden memory here — every decision is explainable
+ * semantic similarity or hidden memory here, every decision is explainable
  * from the pack's own fields and the user's explicit choices.
  */
 
@@ -44,7 +44,7 @@ export function decidePack(task: Task, pack: ContextPack): PackDecision {
     return { pack, state: "active", reason: "Included because it's marked Always On." };
   }
 
-  // 5. Suggested — active only when its tags overlap the task.
+  // 5. Suggested, active only when its tags overlap the task.
   if (pack.activation === "suggested") {
     const shared = overlap(pack.tags, task.tags);
     if (shared.length > 0) {
@@ -57,12 +57,12 @@ export function decidePack(task: Task, pack: ContextPack): PackDecision {
     return {
       pack,
       state: "available",
-      reason: "Suggested — add it if it fits this task.",
+      reason: "Suggested, add it if it fits this task.",
     };
   }
 
-  // 6. Manual — available until the user adds it.
-  return { pack, state: "available", reason: "Manual — add it when you need it." };
+  // 6. Manual, available until the user adds it.
+  return { pack, state: "available", reason: "Manual, add it when you need it." };
 }
 
 export function selectPacks(task: Task, packs: ContextPack[]): PackDecision[] {

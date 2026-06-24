@@ -95,6 +95,14 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
   );
   const contractCount = docContract?.items.filter((i) => i.status !== "rejected").length ?? 0;
 
+  // Approved-voice context for AutoTune (a starting-posture nudge, never durable).
+  const voicePack = activePacks.find((p) => p.kind === "voice");
+  const voiceSummary = voicePack?.summary || undefined;
+  const voiceDirectLowHype = Boolean(
+    voicePack && /\b(direct|low-?hype|plain|specific|avoid (inflated|hype|generic)|no hype)\b/i.test(`${voicePack.summary} ${voicePack.details}`),
+  );
+  const tuneModelId = ws.providerStatus?.fastModel ?? ws.providerStatus?.model ?? "";
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -112,7 +120,7 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
     ],
     content: (doc.contentJson as object) ?? { type: "doc", content: [{ type: "paragraph" }] },
     editorProps: {
-      // Keep Grammarly/LanguageTool out of the ProseMirror DOM — their injected
+      // Keep Grammarly/LanguageTool out of the ProseMirror DOM, their injected
       // nodes break React/PM reconciliation (the "insertBefore" crash).
       attributes: {
         class: "tiptap-prose focus:outline-none",
@@ -125,7 +133,7 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
     onUpdate: ({ editor }) => scheduleSave(editor),
   });
 
-  // Autosave (debounced) — content, title, brief, version.
+  // Autosave (debounced), content, title, brief, version.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function scheduleSave(ed: Editor) {
     const text = ed.getText();
@@ -326,13 +334,24 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
       )}
 
       <div className="reveal reveal-4 mt-4 border-t border-rule pt-4">
-        {editor && <SelectionTune editor={editor} brief={brief} providerConfigured={providerConfigured} />}
+        {editor && (
+          <SelectionTune
+            editor={editor}
+            brief={brief}
+            providerConfigured={providerConfigured}
+            contractItems={contractItems}
+            modelId={tuneModelId}
+            recommendInstruction={whatFor}
+            voiceSummary={voiceSummary}
+            voiceDirectLowHype={voiceDirectLowHype}
+          />
+        )}
         <EditorContent editor={editor} />
       </div>
 
       {!providerConfigured && liveHelp && (
         <p className="mt-4 rounded-md border border-rule bg-surface-sunk px-3 py-2 text-2xs text-ink-muted">
-          Continuity checks run locally — commitments, contradictions, and overpromises are flagged with no
+          Continuity checks run locally, commitments, contradictions, and overpromises are flagged with no
           provider key. Ghost completions and AI rewrites stay off until a server key is set; the sliders still
           show the exact prompt they would send. Nothing is faked.
         </p>
@@ -422,7 +441,7 @@ function InsightCard({
   return (
     <div className="rounded-md border border-rule bg-surface px-3.5 py-2.5 shadow-card">
       <div className="flex items-start gap-2">
-        <span className={cx("mt-0.5 shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em]", accent.soft)}>
+        <span className={cx("mt-0.5 shrink-0 rounded-sm px-1.5 py-0.5 text-2xs font-medium", accent.soft)}>
           {INSIGHT_LABEL[insight.kind]}
         </span>
         <div className="min-w-0 flex-1">

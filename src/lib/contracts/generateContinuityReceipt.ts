@@ -54,7 +54,7 @@ function lines(items: ContractItem[]): string {
 /** Copyable / exportable receipt. Always the five headings. */
 export function receiptToMarkdown(r: ContinuityReceipt, title = "Continuity receipt"): string {
   const conflictLines = r.contradictions.length
-    ? r.contradictions.map((c) => `- ${c.statement} — conflict (${c.severity}): ${c.rationale}`).join("\n")
+    ? r.contradictions.map((c) => `- ${c.statement}, conflict (${c.severity}): ${c.rationale}`).join("\n")
     : "- (none)";
   return [
     `# ${title}`,

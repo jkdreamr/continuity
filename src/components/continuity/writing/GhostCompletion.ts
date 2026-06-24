@@ -5,7 +5,7 @@ import { shouldComplete } from "@/lib/writing/completionGate";
 
 /**
  * Ghost completion. The suggestion lives in plugin state and renders as a widget
- * decoration — it is NEVER part of the document until the user presses Tab.
+ * decoration, it is NEVER part of the document until the user presses Tab.
  *
  * Gates: idle timer, collapsed cursor, no IME composition, deterministic
  * `shouldComplete` (context length, code/url/email, finished paragraph).

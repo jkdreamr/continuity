@@ -122,7 +122,7 @@ export function PackEditor({
           label="Details"
           value={draft.details}
           onChange={(v) => set("details", v)}
-          placeholder="The specifics — words you use, things you avoid, facts that matter."
+          placeholder="The specifics, words you use, things you avoid, facts that matter."
           rows={4}
         />
 

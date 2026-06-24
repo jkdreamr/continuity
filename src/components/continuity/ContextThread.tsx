@@ -13,7 +13,7 @@ const GUTTER = 56;
 const SPINE_X = 18;
 
 /**
- * The Context Thread — Continuity's signature. A single spine gathers each
+ * The Context Thread, Continuity's signature. A single spine gathers each
  * active pack (a bead in its kind color) and carries them down into one output
  * terminal. It is decorative only in the sense that the *data* is real: every
  * bead is a pack the compiler is actually using.

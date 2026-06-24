@@ -3,7 +3,7 @@ import { newId } from "@/lib/id";
 
 /**
  * Deterministic contradiction detection: when the output affirms something a
- * constraint/decision prohibits. Conservative — it matches the content words of
+ * constraint/decision prohibits. Conservative, it matches the content words of
  * a prohibition against the text, so it flags real conflicts (e.g. "do not imply
  * fundraising is open" vs "fundraising is now open") without grammar noise.
  */

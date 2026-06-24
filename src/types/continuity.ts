@@ -14,7 +14,7 @@ export type PackScope = Mode | "both";
 
 /**
  * The kind of context a pack carries. Friendly labels live in `PACK_KIND_META`
- * (src/lib/packKinds.ts) — we never lead the UI with the raw enum.
+ * (src/lib/packKinds.ts), we never lead the UI with the raw enum.
  */
 export type PackKind =
   | "voice" // How I sound
@@ -82,9 +82,9 @@ export type OutputArtifact = {
  */
 export type DecisionState =
   | "active" // will be carried into the prompt
-  | "available" // eligible, but off by default — user can add it
+  | "available" // eligible, but off by default, user can add it
   | "excluded" // user removed it from this task
-  | "unavailable"; // wrong mode — a hard boundary, cannot be used here
+  | "unavailable"; // wrong mode, a hard boundary, cannot be used here
 
 export type PackDecision = {
   pack: ContextPack;
@@ -106,7 +106,7 @@ export type ProposalKind =
   | "confirm_build_scope";
 
 /**
- * A memory proposal is derived *only* from saved choices — never from hidden
+ * A memory proposal is derived *only* from saved choices, never from hidden
  * inference. Ids are content-deterministic so a dismissal sticks.
  */
 export type MemoryProposal = {
@@ -224,7 +224,7 @@ export type WritingDocument = {
   brief?: DocumentBrief;
   liveHelpEnabled: boolean;
   activeMemoryOverrides: { includeIds: string[]; excludeIds: string[] };
-  /** V8 — contracts/receipts attached to this document (optional, back-compat). */
+  /** V8, contracts/receipts attached to this document (optional, back-compat). */
   contractIds?: string[];
   receiptIds?: string[];
   version: number;
@@ -232,7 +232,7 @@ export type WritingDocument = {
   updatedAt: string;
 };
 
-/** V8 — continuity-aware insight categories (not generic grammar). */
+/** V8, continuity-aware insight categories (not generic grammar). */
 export type InsightKind =
   | "unclear_ask"
   | "accidental_commitment"
@@ -269,7 +269,7 @@ export type EvidenceSource =
   | "prior_receipt"
   | "document";
 
-/** Where a truth came from — every contract item must carry at least one. */
+/** Where a truth came from, every contract item must carry at least one. */
 export type EvidenceRef = { source: EvidenceSource; excerpt: string };
 
 export type ContractItemKind =

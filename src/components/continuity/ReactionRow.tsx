@@ -5,7 +5,7 @@ import type { Mode, Reaction } from "@/types/continuity";
 import { reactionsFor } from "@/lib/reactions";
 import { cx } from "@/lib/cx";
 
-/** Post-output reactions — the main refinement control. No raw sliders. */
+/** Post-output reactions, the main refinement control. No raw sliders. */
 export function ReactionRow({
   mode,
   onReact,

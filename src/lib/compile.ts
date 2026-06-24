@@ -29,7 +29,7 @@ function packText(pack: ContextPack): string {
 }
 
 function packLine(pack: ContextPack): string {
-  return `- [${kindMeta(pack.kind).noun}] ${pack.name} — ${packText(pack)}`;
+  return `- [${kindMeta(pack.kind).noun}] ${pack.name}, ${packText(pack)}`;
 }
 
 function orderByKind(packs: ContextPack[], order: PackKind[]): ContextPack[] {
@@ -65,7 +65,7 @@ function buildWritingSections(task: Task, active: ContextPack[]): Section[] {
   if (required.length) {
     const lines = required.map((p) =>
       p.kind === "decision"
-        ? `- Keep to a decision already made — ${p.name}: ${packText(p)}`
+        ? `- Keep to a decision already made, ${p.name}: ${packText(p)}`
         : `- Must: ${packText(p)}`,
     );
     sections.push({ title: "Required constraints", body: lines.join("\n") });
@@ -76,7 +76,7 @@ function buildWritingSections(task: Task, active: ContextPack[]): Section[] {
 
   const deliverable = [
     `Deliver a ready-to-use ${task.destination.trim() || "draft"} I can paste directly.`,
-    "Return only the draft — no preamble, notes, or meta-commentary.",
+    "Return only the draft, no preamble, notes, or meta-commentary.",
   ];
   sections.push({ title: "Deliverable format", body: deliverable.join("\n") });
 
@@ -135,7 +135,7 @@ function buildBuildSections(task: Task, active: ContextPack[]): Section[] {
     `- ${phraseFor(getRail("behavior")!, railValue(task, "behavior"))}`,
   ];
   for (const p of active.filter((p) => p.kind === "taste")) {
-    impl.push(`- Honor the visual direction — ${packText(p)}`);
+    impl.push(`- Honor the visual direction, ${packText(p)}`);
   }
   sections.push({ title: "Implementation direction", body: impl.join("\n") });
 
@@ -167,19 +167,19 @@ function framing(task: Task): { header: string; footer: string } {
   if (task.mode === "build") {
     const footers: Record<Task["targetTool"], string> = {
       "Claude Code":
-        "Tool — Claude Code: work in small, verifiable steps. Show a short plan before editing, and stop if scope grows beyond the above.",
+        "Tool, Claude Code: work in small, verifiable steps. Show a short plan before editing, and stop if scope grows beyond the above.",
       Lovable:
-        'Tool — Lovable: apply this as a scoped change to the current project. Keep everything under "Do not change" intact.',
-      "Generic": "Tool — generic builder: keep the change strictly within the scope above.",
-      ChatGPT: "Tool — ChatGPT: produce a precise change plan; do not invent project details.",
-      Claude: "Tool — Claude: produce a precise change plan; do not invent project details.",
+        'Tool, Lovable: apply this as a scoped change to the current project. Keep everything under "Do not change" intact.',
+      "Generic": "Tool, generic builder: keep the change strictly within the scope above.",
+      ChatGPT: "Tool, ChatGPT: produce a precise change plan; do not invent project details.",
+      Claude: "Tool, Claude: produce a precise change plan; do not invent project details.",
     };
     return { header: "", footer: footers[task.targetTool] };
   }
 
   const headers: Record<Task["targetTool"], string> = {
     ChatGPT: "Use the structured context below as the grounding for this writing task.",
-    Claude: "Here's the context for this task — treat it as decisions I've already made.",
+    Claude: "Here's the context for this task, treat it as decisions I've already made.",
     "Claude Code": "Use the context below as the grounding for this task.",
     Lovable: "Use the context below as the grounding for this task.",
     "Generic": "Use the context below; it reflects decisions I've already made. Then write the piece.",

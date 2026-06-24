@@ -11,7 +11,7 @@ import type {
 /**
  * V5 automatic context selection. Deterministic, conservative, and legible:
  * hard mode boundary first, then approved baseline + a single Space, then
- * keyword matches — each with a confidence band and a plain-language reason.
+ * keyword matches, each with a confidence band and a plain-language reason.
  * Only high-confidence context auto-applies; medium becomes one suggestion;
  * low and manual-only never auto-apply. Bounded by a context budget.
  *
@@ -126,7 +126,7 @@ export function selectContextMix(input: ContextMixInput, packs: ContextPack[]): 
       } else if (textMatch(top.p, input.text)) {
         applied.push(item(top.p, "keyword", `Used because your request mentions ${top.p.name}.`, "high"));
       } else {
-        suggestions.push(item(top.p, "recent", `Maybe relevant — ${top.p.name}?`, "medium"));
+        suggestions.push(item(top.p, "recent", `Maybe relevant, ${top.p.name}?`, "medium"));
         activeSpaceId = null; // medium suggestion isn't auto-applied
       }
     }
@@ -165,7 +165,7 @@ export function selectContextMix(input: ContextMixInput, packs: ContextPack[]): 
       } else if (!baselineLayer && activeSpaceId) {
         suggestions.push(item(pack, "space", "Part of this Space.", "medium"));
       } else {
-        suggestions.push(item(pack, "keyword", "Might fit — based on its tags.", "medium"));
+        suggestions.push(item(pack, "keyword", "Might fit, based on its tags.", "medium"));
       }
     }
   }

@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "bad_request" }, { status: 400 });
   }
 
-  // Honest missing-provider state — never a fake draft.
+  // Honest missing-provider state, never a fake draft.
   if (!adapter) {
     return Response.json({ error: "not_configured" }, { status: 503 });
   }

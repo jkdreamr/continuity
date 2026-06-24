@@ -27,7 +27,7 @@ export function saveWorkspace(ws: Workspace): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ws));
   } catch {
-    // Quota / private-mode failures are non-fatal — the in-memory state still works.
+    // Quota / private-mode failures are non-fatal, the in-memory state still works.
   }
 }
 

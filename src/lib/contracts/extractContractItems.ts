@@ -10,7 +10,7 @@ import { newId, nowIso } from "@/lib/id";
 
 /**
  * Deterministic Context Contract extraction. Runs offline (no provider) so Check
- * mode, receipts, and insights produce real, honest output without a key — a
+ * mode, receipts, and insights produce real, honest output without a key, a
  * provider only deepens it. Detection is pattern-based and conservative:
  * commitments, constraints, decisions, open questions, relationship/tone notes,
  * and concrete facts. Every item carries evidence (the matched text).

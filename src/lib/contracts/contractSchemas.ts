@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ContractItem } from "@/types/continuity";
 import { makeContractItem } from "@/lib/contracts/extractContractItems";
 
-/** Runtime schemas for contracts/receipts — used by persistence + provider validation. */
+/** Runtime schemas for contracts/receipts, used by persistence + provider validation. */
 
 const KIND = z.enum([
   "approved_fact",

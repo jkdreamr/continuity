@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ContextContractSchema, ContinuityReceiptSchema } from "@/lib/contracts/contractSchemas";
 
-/** Runtime schemas mirroring the domain model — used for import + storage validation. */
+/** Runtime schemas mirroring the domain model, used for import + storage validation. */
 
 export const PackKindSchema = z.enum([
   "voice",
@@ -139,12 +139,12 @@ export const WorkspaceSchema = z.object({
   packs: z.array(ContextPackSchema),
   tasks: z.array(TaskSchema),
   artifacts: z.array(OutputArtifactSchema),
-  // V5 — optional with defaults so V4 (v1) data and exports load without loss.
+  // V5, optional with defaults so V4 (v1) data and exports load without loss.
   requests: z.array(QuickRequestSchema).default([]),
   drafts: z.array(DraftSchema).default([]),
-  // V7 — optional with default so V4/V5 data loads without loss.
+  // V7, optional with default so V4/V5 data loads without loss.
   documents: z.array(WritingDocumentSchema).default([]),
-  // V8 — optional with default so V4–V7 data loads without loss.
+  // V8, optional with default so V4–V7 data loads without loss.
   contracts: z.array(ContextContractSchema).default([]),
   receipts: z.array(ContinuityReceiptSchema).default([]),
   dismissedProposals: z.array(z.string()),

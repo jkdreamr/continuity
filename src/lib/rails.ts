@@ -1,7 +1,7 @@
 import type { Mode } from "@/types/continuity";
 
 /**
- * Intent rails. From the thesis: "no placebo sliders" — every rail maps to a
+ * Intent rails. From the thesis: "no placebo sliders", every rail maps to a
  * documented compiler behavior and a concrete instruction line. `phrases`
  * are the exact text the compiler emits at each band, so moving a rail
  * visibly changes the compiled prompt.
@@ -33,9 +33,9 @@ export const WRITING_RAILS: RailDef[] = [
     help: "Sets expected length and how much supporting detail to include.",
     default: 35,
     phrases: {
-      low: "Keep it concise — short sentences, no preamble; cut anything that doesn't earn its place.",
+      low: "Keep it concise, short sentences, no preamble; cut anything that doesn't earn its place.",
       mid: "Aim for a balanced length; include supporting detail only where it helps.",
-      high: "Give the idea room — develop points with context, examples, and connective reasoning.",
+      high: "Give the idea room, develop points with context, examples, and connective reasoning.",
     },
   },
   {
@@ -48,7 +48,7 @@ export const WRITING_RAILS: RailDef[] = [
     phrases: {
       low: "Lead with the point. State the conclusion plainly and early, with minimal hedging.",
       mid: "Make the point clear, but keep the caveats that honesty requires.",
-      high: "Allow nuance — acknowledge tradeoffs and qualify claims where they need it.",
+      high: "Allow nuance, acknowledge tradeoffs and qualify claims where they need it.",
     },
   },
   {
@@ -72,9 +72,9 @@ export const WRITING_RAILS: RailDef[] = [
     help: "Adjusts how strongly the writing owns a recommendation.",
     default: 50,
     phrases: {
-      low: "Take a collaborative stance — invite input, prefer 'we', soften directives.",
+      low: "Take a collaborative stance, invite input, prefer 'we', soften directives.",
       mid: "Balance collaboration with a clear recommendation.",
-      high: "Take an assertive stance — make one clear recommendation and own it.",
+      high: "Take an assertive stance, make one clear recommendation and own it.",
     },
   },
   {
@@ -85,9 +85,9 @@ export const WRITING_RAILS: RailDef[] = [
     help: "Determines whether my source phrasing is locked, preferred, or a reference.",
     default: 30,
     phrases: {
-      low: "Preserve my wording — treat any phrasing I provide as fixed; only fix clear errors.",
+      low: "Preserve my wording, treat any phrasing I provide as fixed; only fix clear errors.",
       mid: "Prefer my phrasing, but improve flow where it clearly helps.",
-      high: "Reframe freely — rewrite for impact while keeping my meaning and intent.",
+      high: "Reframe freely, rewrite for impact while keeping my meaning and intent.",
     },
   },
 ];
@@ -114,9 +114,9 @@ export const BUILD_RAILS: RailDef[] = [
     help: "Visual character, within the project's taste rules.",
     default: 30,
     phrases: {
-      low: "Stay restrained — minimal ornament, system defaults, a quiet visual tone.",
+      low: "Stay restrained, minimal ornament, system defaults, a quiet visual tone.",
       mid: "Balanced expression; deliberate accents, nothing loud.",
-      high: "Be expressive — stronger visual character, still inside the project's taste rules.",
+      high: "Be expressive, stronger visual character, still inside the project's taste rules.",
     },
   },
   {

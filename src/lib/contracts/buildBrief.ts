@@ -16,10 +16,10 @@ import { generateContinuityReceipt } from "@/lib/contracts/generateContinuityRec
  * The Contracted Build Brief (V8). The Build prompt is no longer a bare prompt:
  * it's a brief that names the objective, the context it relies on, the decisions
  * and protected areas it must preserve, the scope (and its boundary), how to
- * verify, and how to roll back — then the exact prompt to paste, plus a
+ * verify, and how to roll back, then the exact prompt to paste, plus a
  * Continuity Receipt so the build is accountable to the contract.
  *
- * It is a thin, deterministic wrapper over the existing compiler — the prompt to
+ * It is a thin, deterministic wrapper over the existing compiler, the prompt to
  * paste is `compileActive(...)` verbatim, so the V7 Build workflow is preserved.
  */
 
@@ -41,7 +41,7 @@ export type BriefSection = { title: string; body: string };
 export type ContractedBuildBrief = {
   objective: string;
   sections: BriefSection[];
-  /** The exact prompt to paste — the deterministic compiler output, unchanged. */
+  /** The exact prompt to paste, the deterministic compiler output, unchanged. */
   promptToPaste: string;
   /** The contract the brief is accountable to (supplied or derived from packs). */
   contract: ContextContract;
@@ -80,16 +80,16 @@ export function packsToContractItems(active: ContextPack[]): ContractItem[] {
 export function buildContractedBrief(
   task: Task,
   active: ContextPack[],
-  opts: { contract?: ContextContract } = {},
+  opts: { contract?: ContextContract; approach?: { label: string; additions: string[] } } = {},
 ): ContractedBuildBrief {
   const goal = task.goal.trim();
   const objective =
-    [task.title.trim(), goal].filter(Boolean).join(" — ") || "(no objective specified)";
+    [task.title.trim(), goal].filter(Boolean).join(", ") || "(no objective specified)";
 
   const byKind = (k: ContextPack["kind"]) => active.filter((p) => p.kind === k);
-  const bullet = (p: ContextPack) => `- [${kindMeta(p.kind).noun}] ${p.name} — ${packText(p)}`;
+  const bullet = (p: ContextPack) => `- [${kindMeta(p.kind).noun}] ${p.name}, ${packText(p)}`;
 
-  // 2. Current context — what is true right now.
+  // 2. Current context, what is true right now.
   const currentContext = [
     ...byKind("project"),
     ...byKind("reference"),
@@ -100,7 +100,7 @@ export function buildContractedBrief(
   // 3. Decisions to preserve.
   const decisions = byKind("decision").map(bullet);
 
-  // 4. Protected areas — do not change.
+  // 4. Protected areas, do not change.
   const protectedAreas = byKind("constraint").map((p) => `- ${packText(p)}`);
   if (railBand(railValue(task, "boldness")) === "low")
     protectedAreas.push(
@@ -116,20 +116,24 @@ export function buildContractedBrief(
     if (line) scope.push(line);
   }
 
-  // 6. Out of scope — the boundary.
+  // 6. Out of scope, the boundary.
   const outOfScope = [
     "- Anything not named in Scope above.",
     "- New dependencies, data migrations, or schema changes unless explicitly required here.",
     ...byKind("constraint").map((p) => `- ${packText(p)}`),
   ];
 
-  // 7. Implementation direction.
+  // 7. Implementation direction (lead with the recommended approach module).
   const implementation: string[] = [];
+  if (opts.approach) {
+    implementation.push(`- Approach: ${opts.approach.label}.`);
+    for (const a of opts.approach.additions) implementation.push(`- ${a}`);
+  }
   for (const id of ["boldness", "behavior"]) {
     const line = railLine(task, id);
     if (line) implementation.push(line);
   }
-  for (const p of byKind("taste")) implementation.push(`- Honor the visual direction — ${packText(p)}`);
+  for (const p of byKind("taste")) implementation.push(`- Honor the visual direction, ${packText(p)}`);
   if (!implementation.length) implementation.push("- Make the smallest change that satisfies the objective.");
 
   // 8. Acceptance checks.

@@ -12,7 +12,7 @@ export function KindBadge({ pack, className }: { pack: ContextPack; className?: 
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-2xs uppercase tracking-[0.08em]",
+        "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-2xs font-medium",
         accent.soft,
         className,
       )}
@@ -28,7 +28,7 @@ export function ActivationBadge({ pack }: { pack: ContextPack }) {
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.08em]",
+        "inline-flex items-center gap-1 text-2xs font-medium",
         on ? "text-green-ink" : "text-ink-faint",
       )}
     >
@@ -40,7 +40,7 @@ export function ActivationBadge({ pack }: { pack: ContextPack }) {
 
 export function MetaLine({ pack }: { pack: ContextPack }) {
   return (
-    <span className="font-mono text-2xs text-ink-faint">
+    <span className="text-2xs text-ink-faint">
       {SCOPE_LABEL[pack.mode]} · {PRIORITY_LABEL[pack.priority]}
     </span>
   );
@@ -49,7 +49,7 @@ export function MetaLine({ pack }: { pack: ContextPack }) {
 /** Tiny tag pill. */
 export function Tag({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-sm bg-surface-sunk px-1.5 py-0.5 font-mono text-2xs text-ink-muted">
+    <span className="rounded-sm bg-surface-sunk px-1.5 py-0.5 text-2xs text-ink-muted">
       {children}
     </span>
   );

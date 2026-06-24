@@ -16,7 +16,7 @@ import { PageHeader, HydrateSkeleton } from "@/components/continuity/page-parts"
 type Category = { id: string; label: string; blurb: string; kinds: PackKind[] };
 
 const CATEGORIES: Category[] = [
-  { id: "voice", label: "Your voice", blurb: "How you sound — and the words you avoid.", kinds: ["voice"] },
+  { id: "voice", label: "Your voice", blurb: "How you sound, and the words you avoid.", kinds: ["voice"] },
   {
     id: "spaces",
     label: "Spaces",
@@ -81,7 +81,7 @@ function LibraryInner() {
         <PageHeader
           eyebrow="Reusable context"
           title="Library"
-          lede="The context Continuity carries for you — your voice, the spaces you work in, the rules you keep, and your visual direction. Edit it once; it rides along automatically."
+          lede="The context Continuity carries for you, your voice, the spaces you work in, the rules you keep, and your visual direction. Edit it once; it rides along automatically."
           actions={
             <Button variant="primary" onClick={() => openNew("voice")}>
               <Plus size={16} /> New
@@ -156,7 +156,7 @@ function LibraryInner() {
                   className="card-lift flex items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 shadow-card"
                 >
                   <span
-                    className={`shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-2xs uppercase ${
+                    className={`shrink-0 rounded-sm px-1.5 py-0.5 text-2xs font-medium capitalize ${
                       r.selectedMode === "build" ? "bg-rust-soft text-rust-ink" : "bg-signal-soft text-signal-ink"
                     }`}
                   >

@@ -35,6 +35,8 @@ import { reactionInstruction } from "@/lib/reactions";
 import { compileActive } from "@/lib/compile";
 import { runContinuityCheck } from "@/lib/contracts/checkService";
 import { packsToContractItems, buildContractedBrief, briefToMarkdown } from "@/lib/contracts/buildBrief";
+import { detectBuildApproach, approachByKey, approachLabel, ALL_APPROACHES } from "@/lib/writing/autoTune/buildApproach";
+import type { BuildApproach } from "@/lib/writing/autoTune/types";
 import { buildContextContract } from "@/lib/contracts/buildContextContract";
 import { ContinuityReceiptPanel } from "@/components/continuity/contracts/ContinuityReceiptPanel";
 import { requestToTask, buildRailsForReaction } from "@/lib/requestTask";
@@ -70,7 +72,7 @@ type GenState =
   | { status: "error"; message: string }
   | { status: "not_configured" };
 
-/** The Now surface choice. "check" is a verb, not a mode — it produces a receipt. */
+/** The Now surface choice. "check" is a verb, not a mode, it produces a receipt. */
 type Surface = Mode | "check";
 
 type CheckState = {
@@ -102,6 +104,7 @@ function NowInner() {
   // Check (paste text → Continuity Receipt).
   const [surface, setSurface] = useState<Surface>("writing");
   const [check, setCheck] = useState<CheckState>({ status: "idle" });
+  const [approachOverride, setApproachOverride] = useState<BuildApproach | null>(null);
   // Resolved after mount so server + first client render agree (no hydration mismatch).
   const [modKey, setModKey] = useState("⌘");
   const [source, setSource] = useState("");
@@ -131,7 +134,14 @@ function NowInner() {
   );
   const currentDraft = drafts[0] ?? null;
 
-  // The Contracted Build Brief for a Build result — its receipt makes the brief
+  // Recommended Build approach (V10), with a user override.
+  const detectedApproach = useMemo(
+    () => (request && request.selectedMode === "build" ? detectBuildApproach({ request: request.text }) : null),
+    [request],
+  );
+  const approach = approachOverride ? approachByKey(approachOverride) : detectedApproach;
+
+  // The Contracted Build Brief for a Build result, its receipt makes the brief
   // accountable to the contract, and the whole 12-part brief is copyable.
   const buildBrief = useMemo(() => {
     if (!request || request.selectedMode !== "build") return null;
@@ -141,8 +151,10 @@ function NowInner() {
     ).applied
       .map((a) => packs.find((p) => p.id === a.contextId))
       .filter(Boolean) as ContextPack[];
-    return buildContractedBrief(requestToTask(request, buildRailsForReaction()), active);
-  }, [request, packs]);
+    return buildContractedBrief(requestToTask(request, buildRailsForReaction()), active, {
+      approach: approach ? { label: approach.label, additions: approach.briefAdditions } : undefined,
+    });
+  }, [request, packs, approach]);
 
   const isResult = view === "result" && request;
   const mode: Mode = isResult ? request.selectedMode : surface === "build" ? "build" : "writing";
@@ -257,12 +269,15 @@ function NowInner() {
     }
   }
 
-  function makeBrief(req: QuickRequest, reaction?: BuildReaction) {
+  function makeBrief(req: QuickRequest, reaction?: BuildReaction, approachKey?: BuildApproach | null) {
     const active = activePacksForRequest(req);
     const rails = buildRailsForReaction(reaction);
     let { prompt } = compileActive(requestToTask(req, rails), active);
+    // Lead the pasted prompt with the recommended approach module (V10).
+    const ap = approachKey ? approachByKey(approachKey) : detectBuildApproach({ request: req.text });
+    prompt = `RECOMMENDED APPROACH: ${ap.label}\n${ap.briefAdditions.map((a) => `- ${a}`).join("\n")}\n\n` + prompt;
     if (reaction === "plan_first") {
-      prompt = "PLAN FIRST — return a short numbered plan and an audit of what to touch before any concrete change.\n\n" + prompt;
+      prompt = "PLAN FIRST: return a short numbered plan and an audit of what to touch before any concrete change.\n\n" + prompt;
     }
     ws.recordDraft({
       id: newId("draft"),
@@ -321,7 +336,7 @@ function NowInner() {
     const text = (source.trim() || askText).trim();
     if (!text) return;
     const contractItems = packsToContractItems(activePacks);
-    // Instant, offline, honest — the deterministic receipt shows immediately.
+    // Instant, offline, honest, the deterministic receipt shows immediately.
     const local = runContinuityCheck({ text, contractItems });
     setCheck({ status: "idle", receipt: local.receipt });
 
@@ -485,6 +500,33 @@ function NowInner() {
           {request.text}
         </p>
 
+        {mode === "build" && approach && (
+          <div className="rounded-md border border-rule bg-surface px-3.5 py-2.5 shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[13px] font-medium text-ink">Recommended approach: {approach.label}</p>
+              <label className="flex items-center gap-1.5 text-2xs text-ink-muted">
+                Change
+                <select
+                  value={approach.approach}
+                  onChange={(e) => {
+                    const a = e.target.value as BuildApproach;
+                    setApproachOverride(a);
+                    if (request) makeBrief(request, undefined, a);
+                  }}
+                  className="rounded border border-rule bg-surface px-1.5 py-1 text-2xs text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-signal"
+                >
+                  {ALL_APPROACHES.map((a) => (
+                    <option key={a} value={a}>
+                      {approachLabel(a)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="mt-0.5 text-2xs text-ink-muted">{approach.reason}</p>
+          </div>
+        )}
+
         {gen.status === "not_configured" ? (
           <NotConfigured prompt={editBuffer || promptPreview(mixText, source, request, activePacks, mode)} onCopy={copyPrompt} />
         ) : gen.status === "loading" && !currentDraft ? (
@@ -575,8 +617,8 @@ function NowInner() {
                   </Button>
                 </div>
                 <p className="text-2xs leading-relaxed text-ink-muted">
-                  The prompt above is ready to paste. This receipt records what the build relies on, the decisions it
-                  must preserve, and what should carry forward — so the change stays accountable to your context.
+                  The prompt above is ready to paste. The receipt below shows what the build relies on and what it must
+                  keep intact.
                 </p>
                 <ContinuityReceiptPanel receipt={buildBrief.receipt} />
               </div>
@@ -623,8 +665,8 @@ function NowInner() {
               surface === "build"
                 ? "Describe the software change you need…"
                 : surface === "check"
-                  ? "Paste the text to check — a draft, an email, or an AI output…"
-                  : "What do you want to write? (optional — or just open a blank page)"
+                  ? "Paste anything to check. A draft, an email, an AI reply."
+                  : "What do you want to write?"
             }
             rows={4}
             className="w-full resize-none bg-transparent px-2 py-1.5 text-[16px] leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none"
@@ -706,10 +748,9 @@ function NowInner() {
                 onSaveCarryForward={saveCheckedItem}
               />
             ) : (
-              <p className="rounded-md border border-rule bg-surface-sunk px-3.5 py-2.5 text-2xs leading-relaxed text-ink-muted">
-                Paste any text and Continuity returns a receipt: the commitments it creates, the
-                assumptions it makes, anything that contradicts your saved context, and what is worth
-                preserving. Runs locally — no key required.
+              <p className="rounded-md border border-rule bg-surface-sunk px-3.5 py-2.5 text-[13px] leading-relaxed text-ink-muted">
+                Paste anything and get a receipt back: the promises it makes, the assumptions it leans on, and anything
+                that clashes with your saved context. Runs on your device, no key needed.
               </p>
             )}
           </div>
@@ -810,11 +851,10 @@ function NotConfigured({ prompt, onCopy }: { prompt: string; onCopy: () => void 
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-signal/30 bg-signal-soft px-4 py-3.5">
-        <p className="text-[13px] font-medium text-signal-ink">Direct drafting needs a server-side AI provider key.</p>
-        <p className="mt-1 text-2xs leading-relaxed text-signal-ink/80">
-          Set <code className="font-mono">ANTHROPIC_API_KEY</code> (or <code className="font-mono">OPENAI_API_KEY</code>) in
-          your environment and reload. Nothing is faked — until a provider is configured, here is the exact prompt
-          Continuity assembled, ready to paste into ChatGPT or Claude.
+        <p className="text-[13px] font-medium text-signal-ink">Drafting needs an AI provider key on the server.</p>
+        <p className="mt-1 text-[13px] leading-relaxed text-signal-ink/80">
+          Add one and reload. Until then, nothing is faked. Here is the exact prompt Continuity built, ready to paste
+          into ChatGPT or Claude.
         </p>
       </div>
       <div className="overflow-hidden rounded-lg border border-rule bg-surface shadow-card">
@@ -894,11 +934,12 @@ function SurfaceChoice({ surface, onChange }: { surface: Surface; onChange: (m: 
 
 function RecentWork({ onOpen }: { onOpen: (requestId: string) => void }) {
   const ws = useWorkspace();
-  const docs = [...ws.workspace.documents].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 4);
+  // A launcher, not a dashboard: at most five quiet rows beneath the fold.
+  const docs = [...ws.workspace.documents].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 3);
   const builds = ws.workspace.requests
     .filter((r) => r.selectedMode === "build")
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 3);
+    .slice(0, 5 - docs.length);
   if (!docs.length && !builds.length) return null;
   return (
     <div className="reveal reveal-4 mt-8 space-y-2">
@@ -909,7 +950,7 @@ function RecentWork({ onOpen }: { onOpen: (requestId: string) => void }) {
           href={`/write?doc=${d.id}`}
           className="card-lift flex w-full items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left shadow-card"
         >
-          <span className="shrink-0 rounded-sm bg-signal-soft px-1.5 py-0.5 font-mono text-2xs uppercase text-signal-ink">doc</span>
+          <span className="shrink-0 rounded-sm bg-signal-soft px-1.5 py-0.5 text-2xs font-medium text-signal-ink">Doc</span>
           <span className="truncate text-[13px] text-ink-muted">{d.title || d.plainText.slice(0, 80) || "Untitled draft"}</span>
         </Link>
       ))}
@@ -920,7 +961,7 @@ function RecentWork({ onOpen }: { onOpen: (requestId: string) => void }) {
           onClick={() => onOpen(r.id)}
           className="card-lift flex w-full items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left shadow-card"
         >
-          <span className="shrink-0 rounded-sm bg-rust-soft px-1.5 py-0.5 font-mono text-2xs uppercase text-rust-ink">build</span>
+          <span className="shrink-0 rounded-sm bg-rust-soft px-1.5 py-0.5 text-2xs font-medium text-rust-ink">Build</span>
           <span className="truncate text-[13px] text-ink-muted">{r.text}</span>
         </button>
       ))}

@@ -55,7 +55,7 @@ export function ContextDrawer({
       open={open}
       onClose={onClose}
       title="What Continuity is using"
-      description="Chosen from your saved context — change anything for this request."
+      description="Chosen from your saved context, change anything for this request."
     >
       <div className="space-y-6">
         {applied.length === 0 && !source && (
@@ -97,7 +97,7 @@ export function ContextDrawer({
               <p className="text-[13px] font-medium text-ink">Pasted source text</p>
               <p className="mt-0.5 line-clamp-2 text-2xs text-ink-faint">{source}</p>
               <p className="mt-1 text-2xs text-green-ink">
-                Temporary — used for this request only, not remembered.
+                Temporary, used for this request only, not remembered.
               </p>
             </div>
           </section>
@@ -150,7 +150,7 @@ export function ContextDrawer({
         </section>
 
         <p className="border-t border-rule pt-3 text-2xs leading-relaxed text-ink-faint">
-          Continuity learns only from what you write, paste, import, or approve — never from your
+          Continuity learns only from what you write, paste, import, or approve, never from your
           browser tabs, clipboard, or accounts. Sensitive items are never auto-applied.
         </p>
       </div>

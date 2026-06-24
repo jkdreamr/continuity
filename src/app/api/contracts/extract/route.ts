@@ -15,7 +15,7 @@ const Body = z.object({
 /**
  * Provider-only deeper extraction. The deterministic extractor already runs on
  * the client; this route exists for the enrichment path and is honest about a
- * missing key (503) — it never fabricates items.
+ * missing key (503), it never fabricates items.
  */
 export async function POST(req: Request) {
   const adapter = getAdapter();

@@ -6,7 +6,7 @@ import { contractKindMeta } from "@/lib/contracts/contractMeta";
 import { ContractItemCard } from "@/components/continuity/contracts/ContractItemCard";
 
 /**
- * Inspectable view of a Context Contract — the structured truths the work is
+ * Inspectable view of a Context Contract, the structured truths the work is
  * accountable to, grouped by kind. Proposed items can be accepted (made active)
  * or dismissed. Nothing here was collected silently; every item traces to text
  * the user wrote, pasted, imported, or approved.
@@ -46,7 +46,7 @@ export function ContextContractDrawer({
         {items.length === 0 && (
           <p className="text-[13px] text-ink-muted">
             Nothing here yet. Continuity proposes contract items from what you write, paste, import,
-            or approve — never from anything collected silently.
+            or approve, never from anything collected silently.
           </p>
         )}
 

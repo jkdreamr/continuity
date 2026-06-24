@@ -64,12 +64,12 @@ type WorkspaceApi = {
   recordDraft: (draft: Draft) => void;
   updateDraft: (id: string, content: string) => void;
 
-  // V7 — writing documents
+  // V7, writing documents
   createDocument: (partial?: Partial<WritingDocument>) => WritingDocument;
   updateDocument: (id: string, patch: Partial<WritingDocument>) => void;
   deleteDocument: (id: string) => void;
 
-  // V8 — context contracts & continuity receipts
+  // V8, context contracts & continuity receipts
   saveContract: (contract: ContextContract) => void;
   addContractItem: (contractId: string, item: ContractItem) => void;
   updateContractItem: (contractId: string, itemId: string, patch: Partial<ContractItem>) => void;
@@ -318,7 +318,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setWorkspace((ws) => ({ ...ws, documents: ws.documents.filter((d) => d.id !== id) }));
   }, []);
 
-  // V8 — contracts/receipts. All additive; existing data is never disturbed.
+  // V8, contracts/receipts. All additive; existing data is never disturbed.
   const saveContract = useCallback<WorkspaceApi["saveContract"]>((contract) => {
     setWorkspace((ws) => {
       const exists = ws.contracts.some((c) => c.id === contract.id);
@@ -401,7 +401,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         const ts = nowIso();
         const voice: ContextPack = {
           id: newId("pack"),
-          name: `Voice — ${src.name}`,
+          name: `Voice, ${src.name}`,
           kind: "voice",
           mode: "writing",
           summary: src.summary,

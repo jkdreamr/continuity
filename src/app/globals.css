@@ -5,7 +5,7 @@
 :root {
   --ink: #101419;
   --ink-muted: #5a6472;
-  --ink-faint: #8a94a3;
+  --ink-faint: #646e7c;
   --paper: #f7f8f9;
   --surface: #ffffff;
   --signal: #3157e8;
@@ -39,9 +39,9 @@
 }
 
 @layer components {
-  /* Small uppercase mono label used for metadata + section eyebrows. */
+  /* Quiet section label, plain sentence-case sans, not uppercase mono. */
   .eyebrow {
-    @apply font-mono text-2xs uppercase tracking-[0.14em] text-ink-muted;
+    @apply text-[12px] font-semibold text-ink-muted;
   }
   .hairline {
     @apply border-rule;
@@ -128,6 +128,36 @@
   animation: thread-flow 1.1s linear infinite;
 }
 
+/* Live Tune diff decorations, visible reshape without a motion library. */
+.tune-active {
+  background: rgba(49, 87, 232, 0.08);
+  border-radius: 2px;
+  transition: background 0.12s ease-out;
+}
+@keyframes tune-ins {
+  from {
+    opacity: 0.35;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tune-ins {
+    animation: tune-ins 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+    background: rgba(49, 87, 232, 0.08);
+    border-radius: 2px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tune-ins {
+    background: rgba(49, 87, 232, 0.12);
+    border-radius: 2px;
+  }
+}
+
 /* Tiptap writing editor */
 .tiptap-prose {
   font-size: 1.0625rem;
@@ -143,8 +173,8 @@
 }
 .tiptap-prose h2,
 .tiptap-prose h3 {
-  font-family: var(--font-newsreader), Georgia, serif;
-  font-weight: 600;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
   letter-spacing: -0.01em;
   margin: 1.2em 0 0.4em;
 }

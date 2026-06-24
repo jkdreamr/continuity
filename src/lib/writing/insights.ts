@@ -5,7 +5,7 @@ import { newId } from "@/lib/id";
 /**
  * Insight validation. Model output is untrusted: anything with a bad kind,
  * an invalid range, or an oversize replacement is dropped (fail closed). At
- * most three survive. No grammar squiggles — only the allowed semantic kinds.
+ * most three survive. No grammar squiggles, only the allowed semantic kinds.
  */
 
 const InsightSchema = z.object({

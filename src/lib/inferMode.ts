@@ -3,7 +3,7 @@ import type { Mode } from "@/types/continuity";
 /**
  * Lightweight, conservative mode inference. Writing is the default; Build is
  * inferred only when the request clearly signals software work. The user can
- * always flip the mode chip — this just picks a sensible starting point.
+ * always flip the mode chip, this just picks a sensible starting point.
  */
 
 // Strong, unambiguous software signals.

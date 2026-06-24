@@ -8,7 +8,7 @@ export function newId(prefix: string): string {
   return `${prefix}_${time}${rand}`;
 }
 
-/** Current ISO timestamp — isolated here so callers stay easy to reason about. */
+/** Current ISO timestamp, isolated here so callers stay easy to reason about. */
 export function nowIso(): string {
   return new Date().toISOString();
 }

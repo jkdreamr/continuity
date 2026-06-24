@@ -2,7 +2,7 @@ import type { PackAccent } from "@/lib/packKinds";
 
 /**
  * Semantic accent classes. Color is used to mark provenance and state, never as
- * decoration — most surfaces stay neutral. Class strings are literal so
+ * decoration, most surfaces stay neutral. Class strings are literal so
  * Tailwind can see them.
  */
 export type AccentClasses = {

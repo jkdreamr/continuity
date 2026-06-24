@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 const Body = z.object({ text: z.string().min(1).max(20000) });
 
 /**
- * Explicit source analysis only — the user pasted/uploaded this text. Deterministic
+ * Explicit source analysis only, the user pasted/uploaded this text. Deterministic
  * and offline; never reads clipboard, tabs, or the DOM passively.
  */
 export async function POST(req: Request) {
