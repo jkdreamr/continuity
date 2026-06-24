@@ -112,7 +112,15 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
     ],
     content: (doc.contentJson as object) ?? { type: "doc", content: [{ type: "paragraph" }] },
     editorProps: {
-      attributes: { class: "tiptap-prose focus:outline-none", "aria-label": "Document editor" },
+      // Keep Grammarly/LanguageTool out of the ProseMirror DOM — their injected
+      // nodes break React/PM reconciliation (the "insertBefore" crash).
+      attributes: {
+        class: "tiptap-prose focus:outline-none",
+        "aria-label": "Document editor",
+        "data-gramm": "false",
+        "data-gramm_editor": "false",
+        "data-enable-grammarly": "false",
+      },
     },
     onUpdate: ({ editor }) => scheduleSave(editor),
   });
@@ -259,7 +267,7 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="reveal reveal-1 mb-2 flex items-center justify-between gap-2">
         <Link href="/" aria-label="Back to Now" className="-ml-1.5 rounded p-1.5 text-ink-muted hover:bg-surface-sunk hover:text-ink">
           <ArrowLeft size={18} />
         </Link>
@@ -286,7 +294,7 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
           </button>
         </div>
       </div>
-      <div className="mb-4 min-w-0">
+      <div className="reveal reveal-2 mb-4 min-w-0">
         <UsingLine atoms={atoms} onOpen={() => setDrawerOpen(true)} />
       </div>
 
@@ -295,7 +303,7 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Untitled draft"
         aria-label="Title"
-        className="w-full bg-transparent font-display text-3xl tracking-tight text-ink placeholder:text-ink-faint focus:outline-none"
+        className="reveal reveal-3 w-full bg-transparent font-display text-3xl tracking-tight text-ink placeholder:text-ink-faint focus:outline-none"
       />
 
       <input
@@ -303,7 +311,7 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
         onChange={(e) => setWhatFor(e.target.value)}
         placeholder="What is this for? (optional)"
         aria-label="What is this for"
-        className="mt-2 w-full bg-transparent text-[14px] text-ink-muted placeholder:text-ink-faint focus:outline-none"
+        className="reveal reveal-3 mt-2 w-full bg-transparent text-[14px] text-ink-muted placeholder:text-ink-faint focus:outline-none"
       />
 
       {brief && (
@@ -317,7 +325,7 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
         </div>
       )}
 
-      <div className="mt-4 border-t border-rule pt-4">
+      <div className="reveal reveal-4 mt-4 border-t border-rule pt-4">
         {editor && <SelectionTune editor={editor} brief={brief} providerConfigured={providerConfigured} />}
         <EditorContent editor={editor} />
       </div>

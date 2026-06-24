@@ -21,7 +21,7 @@ export function PackCard({
   return (
     <article
       className={cx(
-        "group flex flex-col rounded-md border border-rule bg-surface p-4 shadow-card transition-colors hover:border-ink/20",
+        "group card-lift flex flex-col rounded-md border border-rule bg-surface p-4 shadow-card",
         className,
       )}
     >

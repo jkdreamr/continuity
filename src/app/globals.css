@@ -5,6 +5,7 @@
 :root {
   --ink: #101419;
   --ink-muted: #5a6472;
+  --ink-faint: #8a94a3;
   --paper: #f7f8f9;
   --surface: #ffffff;
   --signal: #3157e8;
@@ -48,6 +49,68 @@
   /* The compiled-prompt surface reads like a printed brief. */
   .brief {
     @apply font-mono text-[13px] leading-[1.65] text-ink whitespace-pre-wrap break-words;
+  }
+}
+
+/* Orchestrated page-load entrance. Opt-in via .reveal (+ .reveal-N for a
+   staggered cascade). Defined only when motion is welcome, so reduced-motion
+   users get the final state instantly with no opacity flash or delay. */
+@keyframes reveal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tactile, layout-stable hover for clickable cards/rows. */
+@layer components {
+  .card-lift {
+    transition:
+      transform 0.18s ease-out,
+      box-shadow 0.18s ease-out,
+      border-color 0.18s ease-out;
+  }
+  .card-lift:hover {
+    border-color: rgba(16, 20, 25, 0.18);
+    box-shadow:
+      0 4px 16px -8px rgba(16, 20, 25, 0.14),
+      0 1px 2px rgba(16, 20, 25, 0.04);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    animation: reveal-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .reveal-1 {
+    animation-delay: 40ms;
+  }
+  .reveal-2 {
+    animation-delay: 90ms;
+  }
+  .reveal-3 {
+    animation-delay: 140ms;
+  }
+  .reveal-4 {
+    animation-delay: 190ms;
+  }
+  .reveal-5 {
+    animation-delay: 240ms;
+  }
+  .reveal-6 {
+    animation-delay: 290ms;
+  }
+  /* Press feedback only where motion is welcome. */
+  .card-lift:hover {
+    transform: translateY(-1px);
+  }
+  .card-lift:active {
+    transform: translateY(0);
+    transition-duration: 0.06s;
   }
 }
 
@@ -136,6 +199,7 @@
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;

@@ -77,21 +77,23 @@ function LibraryInner() {
 
   return (
     <div className="space-y-9">
-      <PageHeader
-        eyebrow="Reusable context"
-        title="Library"
-        lede="The context Continuity carries for you — your voice, the spaces you work in, the rules you keep, and your visual direction. Edit it once; it rides along automatically."
-        actions={
-          <Button variant="primary" onClick={() => openNew("voice")}>
-            <Plus size={16} /> New
-          </Button>
-        }
-      />
+      <div className="reveal">
+        <PageHeader
+          eyebrow="Reusable context"
+          title="Library"
+          lede="The context Continuity carries for you — your voice, the spaces you work in, the rules you keep, and your visual direction. Edit it once; it rides along automatically."
+          actions={
+            <Button variant="primary" onClick={() => openNew("voice")}>
+              <Plus size={16} /> New
+            </Button>
+          }
+        />
+      </div>
 
-      {CATEGORIES.map((cat) => {
+      {CATEGORIES.map((cat, i) => {
         const items = ws.workspace.packs.filter((p) => cat.kinds.includes(p.kind));
         return (
-          <section key={cat.id} className="space-y-3">
+          <section key={cat.id} className={`reveal reveal-${Math.min(i + 1, 6)} space-y-3`}>
             <div className="flex items-end justify-between gap-3 border-b border-rule pb-2">
               <div>
                 <h2 className="font-display text-xl text-ink">{cat.label}</h2>
@@ -129,7 +131,7 @@ function LibraryInner() {
         );
       })}
 
-      <section className="space-y-3">
+      <section className="reveal reveal-5 space-y-3">
         <div className="border-b border-rule pb-2">
           <h2 className="font-display text-xl text-ink">Recent work</h2>
           <p className="mt-0.5 text-[13px] text-ink-muted">Requests and drafts save here automatically.</p>
@@ -151,7 +153,7 @@ function LibraryInner() {
                 <Link
                   key={r.id}
                   href={`/?request=${r.id}`}
-                  className="flex items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 shadow-card transition-colors hover:border-ink/20"
+                  className="card-lift flex items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 shadow-card"
                 >
                   <span
                     className={`shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-2xs uppercase ${

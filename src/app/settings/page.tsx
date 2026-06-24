@@ -52,7 +52,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-7">
+    <div className="reveal space-y-7">
       <PageHeader
         eyebrow="Data control"
         title="Settings"
@@ -63,7 +63,7 @@ export default function SettingsPage() {
         <ShieldCheck size={18} className="mt-0.5 shrink-0 text-green-ink" />
         <div>
           <p className="text-[13px] font-medium text-green-ink">
-            Your MVP data stays in this browser unless you export it.
+            Your workspace stays in this browser unless you export it.
           </p>
           <p className="mt-0.5 text-2xs leading-snug text-green-ink/80">
             No account, no server, no background collection. Context is selected from the packs and

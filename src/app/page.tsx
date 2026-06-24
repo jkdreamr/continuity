@@ -102,6 +102,8 @@ function NowInner() {
   // Check (paste text → Continuity Receipt).
   const [surface, setSurface] = useState<Surface>("writing");
   const [check, setCheck] = useState<CheckState>({ status: "idle" });
+  // Resolved after mount so server + first client render agree (no hydration mismatch).
+  const [modKey, setModKey] = useState("⌘");
   const [source, setSource] = useState("");
   const [showSource, setShowSource] = useState(false);
   const [askOverrides, setAskOverrides] = useState<{ includeIds: string[]; excludeIds: string[]; spaceId?: string }>({
@@ -200,10 +202,12 @@ function NowInner() {
     }
   }, [paramRequest, ws.hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A receipt goes stale the moment the pasted text changes — clear it.
+  // A receipt goes stale the moment the pasted text changes; clear it.
   useEffect(() => {
     setCheck((c) => (c.receipt ? { status: "idle" } : c));
   }, [askText]);
+
+  useEffect(() => setModKey(modifierKey()), []);
 
   if (!ws.hydrated) return <HydrateSkeleton />;
 
@@ -466,7 +470,7 @@ function NowInner() {
   // ---------- RESULT VIEW ----------
   if (isResult) {
     return (
-      <div className="mx-auto max-w-3xl space-y-5">
+      <div className="reveal mx-auto max-w-3xl space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <ModeChip mode={mode} onChange={changeMode} />
@@ -503,6 +507,7 @@ function NowInner() {
               <textarea
                 value={editBuffer}
                 onChange={(e) => onEdit(e.target.value)}
+                data-gramm="false"
                 spellCheck={mode !== "build"}
                 aria-label={mode === "build" ? "Change brief (editable)" : "Draft (editable)"}
                 className={cx(
@@ -592,19 +597,20 @@ function NowInner() {
     <div className="mx-auto max-w-2xl">
       <div className={cx(firstUse ? "pt-6 sm:pt-10" : "pt-2")}>
         {firstUse && (
-          <h1 className="mb-5 font-display text-3xl leading-tight tracking-tight text-ink sm:text-[36px]">
+          <h1 className="reveal mb-5 font-display text-3xl leading-tight tracking-tight text-ink sm:text-[36px]">
             What are you trying to make?
           </h1>
         )}
 
-        <div className="mb-3 flex justify-center">
+        <div className="reveal reveal-1 mb-3 flex justify-center">
           <SurfaceChoice surface={surface} onChange={setSurface} />
         </div>
 
-        <div className="rounded-xl border border-rule bg-surface p-3 shadow-card focus-within:border-ink/25">
+        <div className="reveal reveal-2 rounded-xl border border-rule bg-surface p-3 shadow-card focus-within:border-ink/25">
           <textarea
             ref={askRef}
             autoFocus
+            data-gramm="false"
             value={askText}
             onChange={(e) => setAskText(e.target.value)}
             onKeyDown={(e) => {
@@ -627,6 +633,7 @@ function NowInner() {
           {showSource && (
             <textarea
               value={source}
+              data-gramm="false"
               onChange={(e) => setSource(e.target.value)}
               placeholder="Paste source text to reply to or rewrite (stays on this request only)…"
               rows={3}
@@ -677,15 +684,15 @@ function NowInner() {
           </div>
         </div>
 
-        <p className="mt-2 px-1 text-2xs text-ink-faint">
+        <p className="reveal reveal-3 mt-2 px-1 text-2xs text-ink-faint">
           {surface === "build" ? "Build Beta · " : ""}
-          Press {modifierKey()}+Enter to{" "}
+          Press {modKey}+Enter to{" "}
           {surface === "build" ? "compile" : surface === "check" ? "run the check" : "open the desk"} ·{" "}
-          {modifierKey()}+K to focus
+          {modKey}+K to focus
         </p>
 
         {surface === "check" && (
-          <div className="mt-4 space-y-2">
+          <div className="reveal reveal-4 mt-4 space-y-2">
             {check.status === "loading" && (
               <p className="inline-flex items-center gap-1.5 px-1 text-2xs text-ink-muted">
                 <Loader2 size={12} className="animate-spin text-signal" /> Enriching with your provider…
@@ -709,7 +716,7 @@ function NowInner() {
         )}
 
         {firstUse && (
-          <div className="mt-6 space-y-2">
+          <div className="reveal reveal-4 mt-6 space-y-2">
             <p className="eyebrow">Try</p>
             {EXAMPLES.map((ex) => (
               <button
@@ -719,7 +726,7 @@ function NowInner() {
                   setAskText(ex);
                   setTimeout(() => askRef.current?.focus(), 0);
                 }}
-                className="block w-full rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left text-[14px] text-ink-muted shadow-card transition-colors hover:border-ink/20 hover:text-ink"
+                className="card-lift block w-full rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left text-[14px] text-ink-muted shadow-card hover:text-ink"
               >
                 {ex}
               </button>
@@ -894,13 +901,13 @@ function RecentWork({ onOpen }: { onOpen: (requestId: string) => void }) {
     .slice(0, 3);
   if (!docs.length && !builds.length) return null;
   return (
-    <div className="mt-8 space-y-2">
+    <div className="reveal reveal-4 mt-8 space-y-2">
       <p className="eyebrow">Recent</p>
       {docs.map((d) => (
         <Link
           key={d.id}
           href={`/write?doc=${d.id}`}
-          className="flex w-full items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left shadow-card transition-colors hover:border-ink/20"
+          className="card-lift flex w-full items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left shadow-card"
         >
           <span className="shrink-0 rounded-sm bg-signal-soft px-1.5 py-0.5 font-mono text-2xs uppercase text-signal-ink">doc</span>
           <span className="truncate text-[13px] text-ink-muted">{d.title || d.plainText.slice(0, 80) || "Untitled draft"}</span>
@@ -911,7 +918,7 @@ function RecentWork({ onOpen }: { onOpen: (requestId: string) => void }) {
           key={r.id}
           type="button"
           onClick={() => onOpen(r.id)}
-          className="flex w-full items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left shadow-card transition-colors hover:border-ink/20"
+          className="card-lift flex w-full items-center gap-3 rounded-md border border-rule bg-surface px-3.5 py-2.5 text-left shadow-card"
         >
           <span className="shrink-0 rounded-sm bg-rust-soft px-1.5 py-0.5 font-mono text-2xs uppercase text-rust-ink">build</span>
           <span className="truncate text-[13px] text-ink-muted">{r.text}</span>
