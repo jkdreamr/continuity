@@ -12,6 +12,8 @@ function ws(partial: Partial<Workspace>): Workspace {
     requests: [],
     drafts: [],
     documents: [],
+    contracts: [],
+    receipts: [],
     dismissedProposals: [],
     seededDemo: false,
     ...partial,

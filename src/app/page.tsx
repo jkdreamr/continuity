@@ -14,14 +14,29 @@ import {
   Plus,
   X,
   Loader2,
+  ShieldCheck,
 } from "lucide-react";
-import type { BuildReaction, ContextPack, Draft, Mode, QuickRequest, Reaction, TargetTool } from "@/types/continuity";
+import type {
+  BuildReaction,
+  ContextPack,
+  ContinuityReceipt,
+  ContractItem,
+  Draft,
+  Mode,
+  QuickRequest,
+  Reaction,
+  TargetTool,
+} from "@/types/continuity";
 import { inferBrief } from "@/lib/writing/documentBrief";
 import { selectContextMix } from "@/lib/contextMix";
 import { buildGenerationMessages, flattenMessages } from "@/lib/generationPrompt";
 import { requestDraft } from "@/lib/generateClient";
 import { reactionInstruction } from "@/lib/reactions";
 import { compileActive } from "@/lib/compile";
+import { runContinuityCheck } from "@/lib/contracts/checkService";
+import { packsToContractItems, buildContractedBrief, briefToMarkdown } from "@/lib/contracts/buildBrief";
+import { buildContextContract } from "@/lib/contracts/buildContextContract";
+import { ContinuityReceiptPanel } from "@/components/continuity/contracts/ContinuityReceiptPanel";
 import { requestToTask, buildRailsForReaction } from "@/lib/requestTask";
 import { draftsForRequest } from "@/lib/requests";
 import { newId, nowIso } from "@/lib/id";
@@ -55,6 +70,18 @@ type GenState =
   | { status: "error"; message: string }
   | { status: "not_configured" };
 
+/** The Now surface choice. "check" is a verb, not a mode — it produces a receipt. */
+type Surface = Mode | "check";
+
+type CheckState = {
+  status: "idle" | "loading";
+  receipt?: ContinuityReceipt;
+  enriched?: boolean;
+  provider?: string;
+};
+
+const CHECK_CONTRACT_NAME = "From continuity checks";
+
 export default function NowPage() {
   return (
     <Suspense fallback={<HydrateSkeleton />}>
@@ -71,8 +98,10 @@ function NowInner() {
   const paramRequest = params.get("request");
 
   const [askText, setAskText] = useState("");
-  // The Now choice: Write (the document desk) or Build prompt (the studio).
-  const [surface, setSurface] = useState<Mode>("writing");
+  // The Now choice: Write (the document desk), Build prompt (the studio), or
+  // Check (paste text → Continuity Receipt).
+  const [surface, setSurface] = useState<Surface>("writing");
+  const [check, setCheck] = useState<CheckState>({ status: "idle" });
   const [source, setSource] = useState("");
   const [showSource, setShowSource] = useState(false);
   const [askOverrides, setAskOverrides] = useState<{ includeIds: string[]; excludeIds: string[]; spaceId?: string }>({
@@ -100,8 +129,21 @@ function NowInner() {
   );
   const currentDraft = drafts[0] ?? null;
 
+  // The Contracted Build Brief for a Build result — its receipt makes the brief
+  // accountable to the contract, and the whole 12-part brief is copyable.
+  const buildBrief = useMemo(() => {
+    if (!request || request.selectedMode !== "build") return null;
+    const active = selectContextMix(
+      { text: request.text, mode: "build", spaceId: request.spaceId, includeIds: request.includeIds, excludeIds: request.excludeIds },
+      packs,
+    ).applied
+      .map((a) => packs.find((p) => p.id === a.contextId))
+      .filter(Boolean) as ContextPack[];
+    return buildContractedBrief(requestToTask(request, buildRailsForReaction()), active);
+  }, [request, packs]);
+
   const isResult = view === "result" && request;
-  const mode: Mode = isResult ? request.selectedMode : surface;
+  const mode: Mode = isResult ? request.selectedMode : surface === "build" ? "build" : "writing";
   const mixText = isResult ? request.text : askText;
   const overrides = useMemo(
     () =>
@@ -157,6 +199,11 @@ function NowInner() {
       setView("result");
     }
   }, [paramRequest, ws.hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A receipt goes stale the moment the pasted text changes — clear it.
+  useEffect(() => {
+    setCheck((c) => (c.receipt ? { status: "idle" } : c));
+  }, [askText]);
 
   if (!ws.hydrated) return <HydrateSkeleton />;
 
@@ -239,6 +286,10 @@ function NowInner() {
       startWriting();
       return;
     }
+    if (surface === "check") {
+      void runCheck();
+      return;
+    }
     const text = askText.trim();
     if (!text) return;
     const req: QuickRequest = {
@@ -259,6 +310,49 @@ function NowInner() {
     setView("result");
     setEditBuffer("");
     makeBrief(req);
+  }
+
+  // Source text the check should read: the pasted Source if present, else the ask.
+  async function runCheck() {
+    const text = (source.trim() || askText).trim();
+    if (!text) return;
+    const contractItems = packsToContractItems(activePacks);
+    // Instant, offline, honest — the deterministic receipt shows immediately.
+    const local = runContinuityCheck({ text, contractItems });
+    setCheck({ status: "idle", receipt: local.receipt });
+
+    // If a provider is configured, enrich (never replace) the baseline.
+    if (!ws.providerStatus?.configured) return;
+    setCheck({ status: "loading", receipt: local.receipt });
+    try {
+      const res = await fetch("/api/contracts/check", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text, contract: contractItems }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { receipt?: ContinuityReceipt; enriched?: boolean; provider?: string };
+        setCheck({ status: "idle", receipt: data.receipt ?? local.receipt, enriched: data.enriched, provider: data.provider });
+      } else {
+        setCheck({ status: "idle", receipt: local.receipt });
+      }
+    } catch {
+      setCheck({ status: "idle", receipt: local.receipt });
+    }
+  }
+
+  // Promote one receipt item into a durable, inspectable contract.
+  function saveCheckedItem(item: ContractItem) {
+    const active: ContractItem = { ...item, status: "active" };
+    const existing = ws.workspace.contracts.find((c) => c.name === CHECK_CONTRACT_NAME);
+    if (existing) {
+      ws.addContractItem(existing.id, active);
+    } else {
+      ws.saveContract(
+        buildContextContract({ name: CHECK_CONTRACT_NAME, taskType: "check", items: [active] }),
+      );
+    }
+    toast("Saved to your contract");
   }
 
   function onReact(reaction: Reaction) {
@@ -460,6 +554,29 @@ function NowInner() {
               </button>
             </div>
 
+            {mode === "build" && buildBrief && (
+              <div className="space-y-2 border-t border-rule pt-4">
+                <div className="flex items-center justify-between">
+                  <p className="eyebrow">Contracted build brief</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      void copyText(briefToMarkdown(buildBrief));
+                      toast("Full brief copied");
+                    }}
+                  >
+                    <Copy size={14} /> Copy full brief
+                  </Button>
+                </div>
+                <p className="text-2xs leading-relaxed text-ink-muted">
+                  The prompt above is ready to paste. This receipt records what the build relies on, the decisions it
+                  must preserve, and what should carry forward — so the change stays accountable to your context.
+                </p>
+                <ContinuityReceiptPanel receipt={buildBrief.receipt} />
+              </div>
+            )}
+
             {drafts.length > 1 && (
               <VersionHistory drafts={drafts} currentId={currentDraft?.id} onPick={(d) => setEditBuffer(d.content)} />
             )}
@@ -499,7 +616,9 @@ function NowInner() {
             placeholder={
               surface === "build"
                 ? "Describe the software change you need…"
-                : "What do you want to write? (optional — or just open a blank page)"
+                : surface === "check"
+                  ? "Paste the text to check — a draft, an email, or an AI output…"
+                  : "What do you want to write? (optional — or just open a blank page)"
             }
             rows={4}
             className="w-full resize-none bg-transparent px-2 py-1.5 text-[16px] leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none"
@@ -532,10 +651,21 @@ function NowInner() {
               >
                 {showSource ? <X size={13} /> : <Plus size={13} />} Source
               </button>
-              <Button variant="primary" onClick={run} disabled={surface === "build" && !askText.trim()}>
+              <Button
+                variant="primary"
+                onClick={run}
+                disabled={
+                  (surface === "build" && !askText.trim()) ||
+                  (surface === "check" && !askText.trim() && !source.trim())
+                }
+              >
                 {surface === "build" ? (
                   <>
                     <Wand2 size={16} /> Make a change brief
+                  </>
+                ) : surface === "check" ? (
+                  <>
+                    <ShieldCheck size={16} /> {check.receipt ? "Re-check" : "Run continuity check"}
                   </>
                 ) : (
                   <>
@@ -549,8 +679,34 @@ function NowInner() {
 
         <p className="mt-2 px-1 text-2xs text-ink-faint">
           {surface === "build" ? "Build Beta · " : ""}
-          Press {modifierKey()}+Enter to {surface === "build" ? "compile" : "open the desk"} · {modifierKey()}+K to focus
+          Press {modifierKey()}+Enter to{" "}
+          {surface === "build" ? "compile" : surface === "check" ? "run the check" : "open the desk"} ·{" "}
+          {modifierKey()}+K to focus
         </p>
+
+        {surface === "check" && (
+          <div className="mt-4 space-y-2">
+            {check.status === "loading" && (
+              <p className="inline-flex items-center gap-1.5 px-1 text-2xs text-ink-muted">
+                <Loader2 size={12} className="animate-spin text-signal" /> Enriching with your provider…
+              </p>
+            )}
+            {check.receipt ? (
+              <ContinuityReceiptPanel
+                receipt={check.receipt}
+                enriched={check.enriched}
+                provider={check.provider}
+                onSaveCarryForward={saveCheckedItem}
+              />
+            ) : (
+              <p className="rounded-md border border-rule bg-surface-sunk px-3.5 py-2.5 text-2xs leading-relaxed text-ink-muted">
+                Paste any text and Continuity returns a receipt: the commitments it creates, the
+                assumptions it makes, anything that contradicts your saved context, and what is worth
+                preserving. Runs locally — no key required.
+              </p>
+            )}
+          </div>
+        )}
 
         {firstUse && (
           <div className="mt-6 space-y-2">
@@ -702,33 +858,29 @@ function labelFor(reaction: Reaction): string {
   return reaction.replace(/_/g, " ");
 }
 
-function SurfaceChoice({ surface, onChange }: { surface: Mode; onChange: (m: Mode) => void }) {
+function SurfaceChoice({ surface, onChange }: { surface: Surface; onChange: (m: Surface) => void }) {
+  const tabs: { id: Surface; label: string; icon: React.ReactNode }[] = [
+    { id: "writing", label: "Write", icon: <PenLine size={15} /> },
+    { id: "build", label: "Build prompt", icon: <Wand2 size={15} /> },
+    { id: "check", label: "Check", icon: <ShieldCheck size={15} /> },
+  ];
   return (
     <div role="tablist" aria-label="Surface" className="inline-flex items-center gap-0.5 rounded-lg border border-rule bg-surface-sunk p-0.5">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={surface === "writing"}
-        onClick={() => onChange("writing")}
-        className={cx(
-          "inline-flex items-center gap-1.5 rounded px-3.5 py-1.5 text-sm font-medium transition-colors",
-          surface === "writing" ? "bg-surface text-ink shadow-card" : "text-ink-muted hover:text-ink",
-        )}
-      >
-        <PenLine size={15} /> Write
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={surface === "build"}
-        onClick={() => onChange("build")}
-        className={cx(
-          "inline-flex items-center gap-1.5 rounded px-3.5 py-1.5 text-sm font-medium transition-colors",
-          surface === "build" ? "bg-surface text-ink shadow-card" : "text-ink-muted hover:text-ink",
-        )}
-      >
-        <Wand2 size={15} /> Build prompt
-      </button>
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          aria-selected={surface === t.id}
+          onClick={() => onChange(t.id)}
+          className={cx(
+            "inline-flex items-center gap-1.5 rounded px-3.5 py-1.5 text-sm font-medium transition-colors",
+            surface === t.id ? "bg-surface text-ink shadow-card" : "text-ink-muted hover:text-ink",
+          )}
+        >
+          {t.icon} {t.label}
+        </button>
+      ))}
     </div>
   );
 }

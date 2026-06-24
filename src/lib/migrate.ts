@@ -2,7 +2,7 @@ import type { Workspace } from "@/types/continuity";
 import { WorkspaceSchema } from "@/lib/schema";
 import { textToDoc } from "@/lib/writing/writingDocs";
 
-export const CURRENT_VERSION = 3;
+export const CURRENT_VERSION = 4;
 
 /**
  * Versioned, non-destructive migration.
@@ -59,6 +59,9 @@ export function migrateWorkspace(raw: unknown): Workspace | null {
     requests: Array.isArray(obj.requests) ? obj.requests : [],
     drafts: Array.isArray(obj.drafts) ? obj.drafts : [],
     documents: deriveDocuments(obj),
+    // V8 — additive; Build receipts are generated on open, not in migration.
+    contracts: Array.isArray(obj.contracts) ? obj.contracts : [],
+    receipts: Array.isArray(obj.receipts) ? obj.receipts : [],
     dismissedProposals: Array.isArray(obj.dismissedProposals) ? obj.dismissedProposals : [],
   };
 

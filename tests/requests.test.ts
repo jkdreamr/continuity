@@ -11,6 +11,8 @@ function emptyWs(): Workspace {
     requests: [],
     drafts: [],
     documents: [],
+    contracts: [],
+    receipts: [],
     dismissedProposals: [],
     seededDemo: false,
   };

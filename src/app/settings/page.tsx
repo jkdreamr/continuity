@@ -137,6 +137,14 @@ export default function SettingsPage() {
               request unless you save them.
             </span>
           </li>
+          <li className="flex gap-2">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ink" />
+            <span>
+              <strong className="text-ink">Contracts &amp; receipts:</strong> Continuity learns only from what you
+              write, paste, import, or approve. Continuity Checks run locally with no provider key; sensitive items
+              are never auto-applied, and no inference becomes durable without your confirmation.
+            </span>
+          </li>
         </ul>
       </Card>
 

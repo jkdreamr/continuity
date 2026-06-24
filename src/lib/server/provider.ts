@@ -16,7 +16,9 @@ export interface ProviderAdapter {
 export function getAdapter(): ProviderAdapter | null {
   const config = resolveProviderConfig(process.env);
   if (!config) return null;
-  return config.provider === "anthropic" ? anthropicAdapter(config) : openaiAdapter(config);
+  if (config.provider === "anthropic") return anthropicAdapter(config);
+  if (config.provider === "openai") return openaiAdapter(config);
+  return openrouterAdapter(config);
 }
 
 const MAX_TOKENS = 1500;
@@ -76,6 +78,42 @@ function openaiAdapter(config: ProviderConfig): ProviderAdapter {
         }),
       });
       if (!res.ok) throw new Error(`openai_${res.status}`);
+      const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const text = (data.choices?.[0]?.message?.content ?? "").trim();
+      if (!text) throw new Error("empty_response");
+      return text;
+    },
+  };
+}
+
+/**
+ * OpenRouter — OpenAI-compatible, so the request/response shape mirrors the
+ * OpenAI adapter; only the base URL, auth, and an identifying X-Title differ.
+ * One key reaches many models (incl. free tiers) via `OPENROUTER_MODEL`.
+ */
+function openrouterAdapter(config: ProviderConfig): ProviderAdapter {
+  return {
+    name: "openrouter",
+    model: config.model,
+    async generate({ system, user, signal }) {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        signal,
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${config.apiKey}`,
+          "X-Title": "Continuity",
+        },
+        body: JSON.stringify({
+          model: config.model,
+          max_tokens: MAX_TOKENS,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+        }),
+      });
+      if (!res.ok) throw new Error(`openrouter_${res.status}`);
       const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
       const text = (data.choices?.[0]?.message?.content ?? "").trim();
       if (!text) throw new Error("empty_response");

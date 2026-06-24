@@ -148,6 +148,11 @@ export function ContextDrawer({
             </div>
           )}
         </section>
+
+        <p className="border-t border-rule pt-3 text-2xs leading-relaxed text-ink-faint">
+          Continuity learns only from what you write, paste, import, or approve — never from your
+          browser tabs, clipboard, or accounts. Sensitive items are never auto-applied.
+        </p>
       </div>
     </Drawer>
   );

@@ -18,7 +18,7 @@ describe("migrateWorkspace", () => {
   it("upgrades a V4 (v1) workspace to v2 without losing data", () => {
     const migrated = migrateWorkspace(v1Workspace());
     expect(migrated).not.toBeNull();
-    expect(migrated!.version).toBe(3);
+    expect(migrated!.version).toBe(4);
     expect(migrated!.requests).toEqual([]);
     expect(migrated!.drafts).toEqual([]);
     expect(migrated!.packs).toHaveLength(1);

@@ -5,14 +5,23 @@ import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "next/link";
-import { ArrowLeft, Sparkles, Check, X, Eye } from "lucide-react";
-import type { ContextPack, DocumentBrief, DocumentInsight, WritingDocument } from "@/types/continuity";
+import { ArrowLeft, Sparkles, Check, X, Eye, ScrollText } from "lucide-react";
+import type { ContextPack, ContractItem, DocumentBrief, DocumentInsight, WritingDocument } from "@/types/continuity";
 import { selectContextMix } from "@/lib/contextMix";
 import { inferBrief } from "@/lib/writing/documentBrief";
 import { requestCompletion, requestInsights } from "@/lib/writing/agentClient";
+import { mergeInsights } from "@/lib/writing/insights";
+import { detectContinuityInsights } from "@/lib/writing/continuityInsights";
+import { packsToContractItems } from "@/lib/contracts/buildBrief";
+import { buildContextContract } from "@/lib/contracts/buildContextContract";
+import { makeContractItem } from "@/lib/contracts/extractContractItems";
+import { contractKindMeta } from "@/lib/contracts/contractMeta";
+import { ACCENT } from "@/lib/accent";
 import { cx } from "@/lib/cx";
+import { useToast } from "@/components/ui/Toast";
 import { useWorkspace } from "@/components/continuity/WorkspaceProvider";
 import { ContextDrawer } from "@/components/continuity/ContextDrawer";
+import { ContextContractDrawer } from "@/components/continuity/contracts/ContextContractDrawer";
 import { UsingLine } from "@/components/continuity/UsingLine";
 import { GhostCompletion } from "@/components/continuity/writing/GhostCompletion";
 import { DocumentBriefBar } from "@/components/continuity/writing/DocumentBriefBar";
@@ -22,6 +31,7 @@ const LIVE_HELP_SEEN = "continuity.livehelp.disclosed";
 
 export function DocumentEditor({ doc }: { doc: WritingDocument }) {
   const ws = useWorkspace();
+  const { toast } = useToast();
   const providerConfigured = Boolean(ws.providerStatus?.configured);
 
   const [title, setTitle] = useState(doc.title);
@@ -29,6 +39,7 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
   const [brief, setBrief] = useState<DocumentBrief | undefined>(doc.brief);
   const [liveHelp, setLiveHelp] = useState(doc.liveHelpEnabled);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [contractOpen, setContractOpen] = useState(false);
   const [plainText, setPlainText] = useState(doc.plainText);
   const [insights, setInsights] = useState<DocumentInsight[]>([]);
   const [suppressed, setSuppressed] = useState<Set<string>>(new Set());
@@ -64,6 +75,25 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
   );
   memoryRef.current = activePacks.map((p) => `${p.name}: ${p.summary}`);
   const atoms = activePacks.slice(0, 3).map((p) => (p.kind === "voice" ? "Your voice" : p.name));
+
+  // The contract this document is accountable to: active packs projected into
+  // contract items, plus any contract already attached to the document.
+  const contractItems = useMemo<ContractItem[]>(() => {
+    const fromPacks = packsToContractItems(activePacks);
+    const attached = (doc.contractIds ?? [])
+      .map((id) => ws.workspace.contracts.find((c) => c.id === id))
+      .filter(Boolean)
+      .flatMap((c) => c!.items.filter((i) => i.status !== "rejected"));
+    return [...fromPacks, ...attached];
+  }, [activePacks, doc.contractIds, ws.workspace.contracts]);
+
+  // The durable contract attached to this document (commitments/assumptions saved
+  // from insights). Distinct from the ephemeral pack projection above.
+  const docContract = useMemo(
+    () => (doc.contractIds ?? []).map((id) => ws.workspace.contracts.find((c) => c.id === id)).filter(Boolean)[0] ?? null,
+    [doc.contractIds, ws.workspace.contracts],
+  );
+  const contractCount = docContract?.items.filter((i) => i.status !== "rejected").length ?? 0;
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -125,22 +155,32 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
     }
   }, [whatFor, plainText]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sparse insights: debounced, only when live help + provider are on.
+  // Continuity insights. The deterministic detector runs locally and offline so
+  // the baseline is honest with no key; a provider, when on, only enriches it.
   useEffect(() => {
-    if (!liveHelp || !providerConfigured || plainText.trim().length < 60) {
+    if (plainText.trim().length < 40) {
       setInsights([]);
       return;
     }
+    const local = detectContinuityInsights(plainText, { contract: contractItems }).filter(
+      (i) => !suppressed.has(i.kind),
+    );
+    setInsights(local.slice(0, 3));
+
+    if (!liveHelp || !providerConfigured) return;
     const controller = new AbortController();
     const t = setTimeout(async () => {
-      const result = await requestInsights({ text: plainText, brief, dismissedKinds: [...suppressed] }, controller.signal);
-      setInsights(result.filter((i) => !suppressed.has(i.kind)).slice(0, 3));
+      const remote = await requestInsights(
+        { text: plainText, brief, contract: contractItems.map((i) => i.statement), dismissedKinds: [...suppressed] },
+        controller.signal,
+      );
+      setInsights(mergeInsights(local, remote.filter((i) => !suppressed.has(i.kind))));
     }, 1800);
     return () => {
       clearTimeout(t);
       controller.abort();
     };
-  }, [plainText, liveHelp, providerConfigured, brief, suppressed]);
+  }, [plainText, liveHelp, providerConfigured, brief, suppressed, contractItems]);
 
   function toggleLiveHelp() {
     if (!liveHelp && providerConfigured && typeof window !== "undefined" && !window.localStorage.getItem(LIVE_HELP_SEEN)) {
@@ -157,6 +197,46 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
     if (!range) return;
     editor.chain().focus().insertContentAt(range, insight.proposedText).run();
     setInsights((list) => list.filter((i) => i.id !== insight.id));
+  }
+
+  // Persist a contract item derived from an insight, attached to this document.
+  function saveItemFromInsight(item: ContractItem) {
+    const existingId = doc.contractIds?.[0];
+    const existing = existingId ? ws.workspace.contracts.find((c) => c.id === existingId) : undefined;
+    if (existing) {
+      ws.addContractItem(existing.id, item);
+    } else {
+      const c = buildContextContract({ name: title.trim() || "Document contract", taskType: "writing", items: [item] });
+      ws.saveContract(c);
+      ws.attachToDocument(doc.id, { contractId: c.id });
+    }
+  }
+
+  // Move the cursor to the insight's range so the user can fix it in place.
+  function jumpToInsight(insight: DocumentInsight) {
+    if (!editor) return;
+    const range = findTextRange(editor, plainText.slice(insight.from, insight.to));
+    if (range) editor.chain().focus().setTextSelection(range).scrollIntoView().run();
+  }
+
+  // The single safe action carried by each insight.
+  function actOnInsight(insight: DocumentInsight) {
+    if (insight.proposedText) return applyInsight(insight);
+    const span = plainText.slice(insight.from, insight.to);
+    if (insight.kind === "accidental_commitment") {
+      saveItemFromInsight(makeContractItem("commitment", insight.evidence ?? span, "high", { source: "document" }));
+      toast("Commitment saved to your contract");
+      setInsights((l) => l.filter((i) => i.id !== insight.id));
+      return;
+    }
+    if (insight.kind === "unsupported_specificity") {
+      saveItemFromInsight(makeContractItem("approved_fact", span, "low", { source: "document" }));
+      toast("Marked as an assumption");
+      setInsights((l) => l.filter((i) => i.id !== insight.id));
+      return;
+    }
+    // contradiction / overpromise / buried ask → jump to the spot to fix it.
+    jumpToInsight(insight);
   }
 
   function overrideMemory(packId: string, action: "include" | "exclude" | "clear") {
@@ -183,17 +263,28 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
         <Link href="/" aria-label="Back to Now" className="-ml-1.5 rounded p-1.5 text-ink-muted hover:bg-surface-sunk hover:text-ink">
           <ArrowLeft size={18} />
         </Link>
-        <button
-          type="button"
-          onClick={toggleLiveHelp}
-          aria-pressed={liveHelp}
-          className={cx(
-            "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[13px] font-medium transition-colors",
-            liveHelp ? "border-signal/30 bg-signal-soft text-signal-ink" : "border-rule bg-surface text-ink-muted",
+        <div className="flex items-center gap-2">
+          {contractCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setContractOpen(true)}
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-rule bg-surface px-2.5 py-1 text-[13px] font-medium text-ink-muted hover:text-ink"
+            >
+              <ScrollText size={13} /> Contract · {contractCount}
+            </button>
           )}
-        >
-          <Sparkles size={13} /> Live help: {liveHelp ? "On" : "Off"}
-        </button>
+          <button
+            type="button"
+            onClick={toggleLiveHelp}
+            aria-pressed={liveHelp}
+            className={cx(
+              "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[13px] font-medium transition-colors",
+              liveHelp ? "border-signal/30 bg-signal-soft text-signal-ink" : "border-rule bg-surface text-ink-muted",
+            )}
+          >
+            <Sparkles size={13} /> Live help: {liveHelp ? "On" : "Off"}
+          </button>
+        </div>
       </div>
       <div className="mb-4 min-w-0">
         <UsingLine atoms={atoms} onOpen={() => setDrawerOpen(true)} />
@@ -233,19 +324,20 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
 
       {!providerConfigured && liveHelp && (
         <p className="mt-4 rounded-md border border-rule bg-surface-sunk px-3 py-2 text-2xs text-ink-muted">
-          Live help is on, but no AI provider is configured — ghost completions and insights stay off until a server key is
-          set. Selection Tune still shows the exact prompt it would send. Nothing is faked.
+          Continuity checks run locally — commitments, contradictions, and overpromises are flagged with no
+          provider key. Ghost completions and AI rewrites stay off until a server key is set; the sliders still
+          show the exact prompt they would send. Nothing is faked.
         </p>
       )}
 
       {insights.length > 0 && (
         <div className="mt-5 space-y-2">
-          <p className="eyebrow">Worth a look</p>
+          <p className="eyebrow">Continuity check</p>
           {insights.map((insight) => (
             <InsightCard
               key={insight.id}
               insight={insight}
-              onApply={() => applyInsight(insight)}
+              onAct={() => actOnInsight(insight)}
               onDismiss={() => setInsights((l) => l.filter((i) => i.id !== insight.id))}
               onSuppress={() => {
                 setSuppressed((s) => new Set(s).add(insight.kind));
@@ -266,6 +358,13 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
         onOverride={overrideMemory}
       />
 
+      <ContextContractDrawer
+        open={contractOpen}
+        onClose={() => setContractOpen(false)}
+        contract={docContract}
+        onUpdateItem={(itemId, patch) => docContract && ws.updateContractItem(docContract.id, itemId, patch)}
+      />
+
       {showDisclosure && (
         <div className="fixed inset-x-0 bottom-5 z-50 mx-auto w-[min(92vw,28rem)] rounded-lg border border-rule bg-ink px-4 py-3 text-paper shadow-lift">
           <p className="text-[13px] leading-relaxed">
@@ -282,36 +381,59 @@ export function DocumentEditor({ doc }: { doc: WritingDocument }) {
   );
 }
 
+const INSIGHT_LABEL: Record<DocumentInsight["kind"], string> = {
+  unclear_ask: "Unclear ask",
+  accidental_commitment: "Commitment",
+  unsupported_specificity: "Unsupported",
+  contradicts_contract: "Contradiction",
+  missing_context: "Missing context",
+  relationship_mismatch: "Relationship",
+  decision_drift: "Decision drift",
+  overpromise: "Overpromise",
+};
+
+const SEVERITY_ACCENT: Record<DocumentInsight["severity"], keyof typeof ACCENT> = {
+  high: "rust",
+  medium: "signal",
+  low: "ink",
+};
+
 function InsightCard({
   insight,
-  onApply,
+  onAct,
   onDismiss,
   onSuppress,
 }: {
   insight: DocumentInsight;
-  onApply: () => void;
+  onAct: () => void;
   onDismiss: () => void;
   onSuppress: () => void;
 }) {
   const [preview, setPreview] = useState(false);
+  const accent = ACCENT[SEVERITY_ACCENT[insight.severity]];
   return (
     <div className="rounded-md border border-rule bg-surface px-3.5 py-2.5 shadow-card">
-      <p className="text-[13px] font-medium text-ink">{insight.message}</p>
-      <p className="mt-0.5 text-2xs text-ink-muted">{insight.rationale}</p>
+      <div className="flex items-start gap-2">
+        <span className={cx("mt-0.5 shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em]", accent.soft)}>
+          {INSIGHT_LABEL[insight.kind]}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-medium text-ink">{insight.message}</p>
+          <p className="mt-0.5 text-2xs text-ink-muted">{insight.rationale}</p>
+        </div>
+      </div>
       {preview && insight.proposedText && (
         <p className="mt-2 rounded border border-signal/30 bg-signal-soft px-2.5 py-1.5 text-[13px] text-ink">{insight.proposedText}</p>
       )}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2 pl-[3.25rem]">
         {insight.proposedText && (
-          <>
-            <button type="button" onClick={() => setPreview((v) => !v)} className="inline-flex items-center gap-1 text-2xs font-medium text-ink-muted hover:text-ink">
-              <Eye size={12} /> Preview
-            </button>
-            <button type="button" onClick={onApply} className="inline-flex items-center gap-1 rounded bg-signal px-2 py-0.5 text-2xs font-semibold text-white hover:bg-signal-ink">
-              <Check size={12} /> Apply
-            </button>
-          </>
+          <button type="button" onClick={() => setPreview((v) => !v)} className="inline-flex items-center gap-1 text-2xs font-medium text-ink-muted hover:text-ink">
+            <Eye size={12} /> Preview
+          </button>
         )}
+        <button type="button" onClick={onAct} className="inline-flex items-center gap-1 rounded bg-signal px-2 py-0.5 text-2xs font-semibold text-white hover:bg-signal-ink">
+          <Check size={12} /> {insight.safeAction ?? "Apply"}
+        </button>
         <button type="button" onClick={onDismiss} className="inline-flex items-center gap-1 text-2xs font-medium text-ink-muted hover:text-ink">
           <X size={12} /> Dismiss
         </button>

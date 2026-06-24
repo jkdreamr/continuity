@@ -17,6 +17,23 @@ describe("resolveProviderConfig", () => {
     expect(resolveProviderConfig({ OPENAI_API_KEY: "sk-oa" })?.provider).toBe("openai");
   });
 
+  it("auto-selects OpenRouter when only its key is present, with a free default model", () => {
+    const c = resolveProviderConfig({ OPENROUTER_API_KEY: "sk-or" });
+    expect(c?.provider).toBe("openrouter");
+    expect(c?.apiKey).toBe("sk-or");
+    expect(c?.model).toContain(":free");
+  });
+
+  it("honors an explicit OpenRouter model slug (e.g. a chosen free model)", () => {
+    const c = resolveProviderConfig({ OPENROUTER_API_KEY: "k", OPENROUTER_MODEL: "openrouter/owl-alpha" });
+    expect(c?.model).toBe("openrouter/owl-alpha");
+  });
+
+  it("prefers OpenRouter when AI_PROVIDER=openrouter even if other keys exist", () => {
+    const c = resolveProviderConfig({ AI_PROVIDER: "openrouter", ANTHROPIC_API_KEY: "a", OPENROUTER_API_KEY: "o" });
+    expect(c?.provider).toBe("openrouter");
+  });
+
   it("honors an explicit AI_PROVIDER preference", () => {
     const c = resolveProviderConfig({
       AI_PROVIDER: "openai",

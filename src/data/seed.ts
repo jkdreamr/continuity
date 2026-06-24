@@ -189,13 +189,15 @@ export function buildSeedWorkspace(): Workspace {
   const packs = seedPacks();
   const tasks = seedTasks();
   return {
-    version: 3,
+    version: 4,
     packs,
     tasks,
     artifacts: seedArtifacts(packs, tasks),
     requests: [],
     drafts: [],
     documents: [],
+    contracts: [],
+    receipts: [],
     dismissedProposals: [],
     seededDemo: true,
   };
@@ -203,13 +205,15 @@ export function buildSeedWorkspace(): Workspace {
 
 export function emptyWorkspace(): Workspace {
   return {
-    version: 3,
+    version: 4,
     packs: [],
     tasks: [],
     artifacts: [],
     requests: [],
     drafts: [],
     documents: [],
+    contracts: [],
+    receipts: [],
     dismissedProposals: [],
     seededDemo: false,
   };

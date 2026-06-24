@@ -10,6 +10,9 @@ import {
   useState,
 } from "react";
 import type {
+  ContextContract,
+  ContinuityReceipt,
+  ContractItem,
   ContextPack,
   Draft,
   Mode,
@@ -65,6 +68,13 @@ type WorkspaceApi = {
   createDocument: (partial?: Partial<WritingDocument>) => WritingDocument;
   updateDocument: (id: string, patch: Partial<WritingDocument>) => void;
   deleteDocument: (id: string) => void;
+
+  // V8 — context contracts & continuity receipts
+  saveContract: (contract: ContextContract) => void;
+  addContractItem: (contractId: string, item: ContractItem) => void;
+  updateContractItem: (contractId: string, itemId: string, patch: Partial<ContractItem>) => void;
+  saveReceipt: (receipt: ContinuityReceipt) => void;
+  attachToDocument: (docId: string, ids: { contractId?: string; receiptId?: string }) => void;
 
   exportText: () => string;
   importText: (text: string) => ImportResult;
@@ -308,6 +318,70 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setWorkspace((ws) => ({ ...ws, documents: ws.documents.filter((d) => d.id !== id) }));
   }, []);
 
+  // V8 — contracts/receipts. All additive; existing data is never disturbed.
+  const saveContract = useCallback<WorkspaceApi["saveContract"]>((contract) => {
+    setWorkspace((ws) => {
+      const exists = ws.contracts.some((c) => c.id === contract.id);
+      return {
+        ...ws,
+        contracts: exists
+          ? ws.contracts.map((c) => (c.id === contract.id ? contract : c))
+          : [contract, ...ws.contracts],
+      };
+    });
+  }, []);
+
+  const addContractItem = useCallback<WorkspaceApi["addContractItem"]>((contractId, item) => {
+    setWorkspace((ws) => ({
+      ...ws,
+      contracts: ws.contracts.map((c) =>
+        c.id === contractId
+          ? { ...c, items: [...c.items, item], updatedAt: nowIso() }
+          : c,
+      ),
+    }));
+  }, []);
+
+  const updateContractItem = useCallback<WorkspaceApi["updateContractItem"]>(
+    (contractId, itemId, patch) => {
+      setWorkspace((ws) => ({
+        ...ws,
+        contracts: ws.contracts.map((c) =>
+          c.id === contractId
+            ? {
+                ...c,
+                items: c.items.map((i) =>
+                  i.id === itemId ? { ...i, ...patch, updatedAt: nowIso() } : i,
+                ),
+                updatedAt: nowIso(),
+              }
+            : c,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const saveReceipt = useCallback<WorkspaceApi["saveReceipt"]>((receipt) => {
+    setWorkspace((ws) => ({ ...ws, receipts: [receipt, ...ws.receipts] }));
+  }, []);
+
+  const attachToDocument = useCallback<WorkspaceApi["attachToDocument"]>((docId, ids) => {
+    setWorkspace((ws) => ({
+      ...ws,
+      documents: ws.documents.map((d) => {
+        if (d.id !== docId) return d;
+        const contractIds = ids.contractId
+          ? Array.from(new Set([...(d.contractIds ?? []), ids.contractId]))
+          : d.contractIds;
+        const receiptIds = ids.receiptId
+          ? Array.from(new Set([...(d.receiptIds ?? []), ids.receiptId]))
+          : d.receiptIds;
+        return { ...d, contractIds, receiptIds, updatedAt: nowIso() };
+      }),
+    }));
+  }, []);
+
   const proposals = useMemo(() => generateProposals(workspace), [workspace]);
 
   const acceptProposal = useCallback<WorkspaceApi["acceptProposal"]>((proposal) => {
@@ -395,6 +469,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       createDocument,
       updateDocument,
       deleteDocument,
+      saveContract,
+      addContractItem,
+      updateContractItem,
+      saveReceipt,
+      attachToDocument,
       exportText,
       importText,
       resetDemo,
@@ -424,6 +503,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       createDocument,
       updateDocument,
       deleteDocument,
+      saveContract,
+      addContractItem,
+      updateContractItem,
+      saveReceipt,
+      attachToDocument,
       exportText,
       importText,
       resetDemo,

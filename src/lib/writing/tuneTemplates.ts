@@ -39,33 +39,32 @@ function axis(
   };
 }
 
+// Formal email (manager / investor): directness, how firmly you commit, warmth.
+const FORMAL_EMAIL: TuneTemplate = {
+  axes: [
+    axis("directness", "Directness", "Gentler", "More direct", "soften the ask with a little lead-in", "lead with the point or ask and cut the hedging"),
+    axis("commitment", "Commitment level", "Tentative", "Firm", "keep any commitment tentative and non-binding", "state the commitment firmly, with a concrete owner and time"),
+    axis("warmth", "Warmth", "Crisp", "Warmer", "keep it crisp and businesslike", "add a warmer, more personal touch"),
+  ],
+};
+
 const TEMPLATES: Record<DocumentKind | "build", TuneTemplate> = {
-  manager_email: {
-    axes: [
-      axis("directness", "Directness", "Gentler", "More direct", "soften the ask with a little lead-in", "lead with the point or ask and cut the hedging"),
-      axis("warmth", "Warmth", "Crisp", "Warmer", "keep it crisp and businesslike", "add a warmer, more personal touch"),
-      axis("length", "Length", "Shorter", "Fuller", "make it shorter — trim to the essentials", "give it a little more room to breathe"),
-    ],
-  },
-  investor_follow_up: {
-    axes: [
-      axis("directness", "Directness", "Gentler", "More direct", "soften the ask with a little lead-in", "lead with the point or ask and cut the hedging"),
-      axis("warmth", "Warmth", "Crisp", "Warmer", "keep it crisp and businesslike", "add a warmer, more personal touch"),
-      axis("length", "Length", "Shorter", "Fuller", "make it shorter — trim to the essentials", "give it a little more room to breathe"),
-    ],
-  },
+  manager_email: FORMAL_EMAIL,
+  investor_follow_up: FORMAL_EMAIL,
+  // Product memo: compression, conviction, and how clearly the decision lands.
   memo: {
     axes: [
       axis("compression", "Compression", "Roomy", "Tight", "let it breathe", "compress — tighten and cut filler"),
       axis("conviction", "Conviction", "Measured", "Assertive", "stay measured and exploratory", "state it with conviction and own the recommendation"),
-      axis("polish", "Polish", "Natural", "Refined", "keep it raw and natural", "polish the phrasing and rhythm"),
+      axis("decision", "Decision clarity", "Open", "Decisive", "present the options without forcing a decision", "make the recommendation and the decision unmistakable"),
     ],
   },
+  // Founder update: confidence, level of detail, and how clear the ask is.
   post: {
     axes: [
-      axis("energy", "Energy", "Calm", "Charged", "keep it calm and even", "raise the energy and momentum"),
-      axis("personalness", "Personalness", "Neutral", "Personal", "keep it neutral", "make it more personal and first-person"),
-      axis("polish", "Polish", "Raw", "Refined", "keep it raw and natural", "polish the phrasing"),
+      axis("confidence", "Confidence", "Humble", "Confident", "stay humble and understated", "project quiet confidence without hype"),
+      axis("detail", "Detail", "High-level", "Detailed", "keep it high-level", "add the concrete detail and numbers that back it up"),
+      axis("ask", "Ask clarity", "Soft", "Clear ask", "keep the ask implicit", "make the ask explicit and easy to act on"),
     ],
   },
   reply: {
@@ -82,11 +81,12 @@ const TEMPLATES: Record<DocumentKind | "build", TuneTemplate> = {
       axis("length", "Length", "Shorter", "Fuller", "trim to the essentials", "give it more room"),
     ],
   },
+  // Build brief: safety, whether to keep structure, and how specific to be.
   build: {
     axes: [
       axis("safety", "Safety", "Bolder", "Safer", "allow a bolder change", "make it safer — smallest reversible change; protect schemas, auth, and routing"),
       axis("structure", "Structure", "Reimagine", "Keep", "reimagine the structure", "keep the existing structure and layout"),
-      axis("expression", "Expression", "Restrained", "Expressive", "keep it restrained", "be more expressive within the taste rules"),
+      axis("specificity", "Specificity", "Loose", "Specific", "leave room for interpretation", "be concrete and specific about files, components, and acceptance"),
     ],
   },
 };
@@ -103,6 +103,11 @@ export function tuneTemplate(kind: DocumentKind | "build"): TuneTemplate {
 
 export function defaultAxisValues(t: TuneTemplate): Record<string, number> {
   return Object.fromEntries(t.axes.map((a) => [a.id, 50]));
+}
+
+/** True when every axis sits at neutral — the live edit should restore the original. */
+export function isNeutral(t: TuneTemplate, values: Record<string, number>): boolean {
+  return t.axes.every((a) => band(values[a.id] ?? 50) === "mid");
 }
 
 /** Combine the non-neutral axes into one plain-language instruction. */

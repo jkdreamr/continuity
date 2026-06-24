@@ -27,7 +27,7 @@ describe("V7 migration (v2 -> v3)", () => {
   it("projects writing drafts into editable documents without losing anything", () => {
     const m = migrateWorkspace(v2Workspace());
     expect(m).not.toBeNull();
-    expect(m!.version).toBe(3);
+    expect(m!.version).toBe(4);
     // one document derived from the writing draft
     expect(m!.documents).toHaveLength(1);
     expect(m!.documents[0]!.mode).toBe("writing");

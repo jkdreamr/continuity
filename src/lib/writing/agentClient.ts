@@ -34,7 +34,7 @@ export async function requestCompletion(
 }
 
 export async function requestInsights(
-  payload: { text: string; brief?: DocumentBrief; dismissedKinds?: string[] },
+  payload: { text: string; brief?: DocumentBrief; contract?: string[]; dismissedKinds?: string[] },
   signal: AbortSignal,
 ): Promise<DocumentInsight[]> {
   const r = await post<{ insights: DocumentInsight[] }>("/api/writing/insights", payload, signal);

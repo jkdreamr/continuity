@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ContextContractSchema, ContinuityReceiptSchema } from "@/lib/contracts/contractSchemas";
 
 /** Runtime schemas mirroring the domain model — used for import + storage validation. */
 
@@ -126,6 +127,8 @@ export const WritingDocumentSchema = z.object({
   brief: DocumentBriefSchema.optional(),
   liveHelpEnabled: z.boolean(),
   activeMemoryOverrides: z.object({ includeIds: z.array(z.string()), excludeIds: z.array(z.string()) }),
+  contractIds: z.array(z.string()).optional(),
+  receiptIds: z.array(z.string()).optional(),
   version: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -141,6 +144,9 @@ export const WorkspaceSchema = z.object({
   drafts: z.array(DraftSchema).default([]),
   // V7 — optional with default so V4/V5 data loads without loss.
   documents: z.array(WritingDocumentSchema).default([]),
+  // V8 — optional with default so V4–V7 data loads without loss.
+  contracts: z.array(ContextContractSchema).default([]),
+  receipts: z.array(ContinuityReceiptSchema).default([]),
   dismissedProposals: z.array(z.string()),
   seededDemo: z.boolean(),
 });

@@ -14,11 +14,18 @@ Return JSON: {"completion": string | null}. Rules:
 - Return null when the continuation would be speculative, repetitive, or intrusive.
 - Do not explain your choice.`;
 
-export const INSIGHTS_SYSTEM = `Review only for high-value contextual issues. Return JSON: {"insights": Insight[]} with at most three.
-Allowed kinds: ask_clarity, tone_fit, voice_drift, redundancy, unsupported_specificity.
-Each insight: {kind, from, to, severity, message, rationale, proposedText?} where from/to are character offsets into the provided plain text.
-Do not flag basic spelling/grammar unless it changes the intended meaning.
-Every insight must cite an exact range and explain why it matters for the active brief. Do not invent facts or imitate named people.`;
+export const INSIGHTS_SYSTEM = `You review for CONTINUITY problems, not grammar. Return JSON: {"insights": Insight[]} with at most three.
+Allowed kinds (continuity categories only):
+- unclear_ask: the request is missing, vague, or buried.
+- accidental_commitment: the text promises something the writer may not intend to be held to.
+- unsupported_specificity: a number/date/claim stated as fact with no backing in the supplied context.
+- contradicts_contract: the text conflicts with a supplied contract item (decision, constraint, commitment).
+- missing_context: an active contract item that should appear is absent.
+- relationship_mismatch: tone/formality is wrong for the stated relationship.
+- decision_drift: the text quietly reverses or erodes a prior decision.
+- overpromise: a claim stronger than the writer can stand behind.
+Each insight: {kind, from, to, severity, message, rationale, safeAction?, evidence?, contractItemId?, proposedText?} where from/to are character offsets into the provided plain text.
+Never flag spelling/grammar/style for its own sake. Every insight must cite an exact range, name one safe action, and explain why it matters for continuity. Do not invent facts or imitate named people.`;
 
 export const TRANSFORM_SYSTEM = `Rewrite only the selected passage. Preserve its factual meaning unless the instruction explicitly requests reframing.
 Honor the full instruction and the active document brief. Do not alter surrounding document text.
@@ -51,10 +58,13 @@ export function buildCompletionUser(input: {
     .join("\n");
 }
 
-export function buildInsightsUser(input: { text: string; brief?: DocumentBrief }): string {
-  return [briefLine(input.brief), "Document plain text (offsets are 0-based into this string):", `"""${input.text}"""`].join(
-    "\n",
-  );
+export function buildInsightsUser(input: { text: string; brief?: DocumentBrief; contract?: string[] }): string {
+  return [
+    briefLine(input.brief),
+    input.contract?.length ? `Active contract items:\n- ${input.contract.join("\n- ")}` : "Active contract items: (none).",
+    "Document plain text (offsets are 0-based into this string):",
+    `"""${input.text}"""`,
+  ].join("\n");
 }
 
 export function buildTransformUser(input: {
